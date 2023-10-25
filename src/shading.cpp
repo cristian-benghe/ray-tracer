@@ -90,7 +90,7 @@ glm::vec3 computePhongModel(RenderState& state, const glm::vec3& cameraDirection
     glm::vec3 R = glm::normalize(light - 2 * glm::dot(light, glm::normalize(hitInfo.normal)) * glm::normalize(hitInfo.normal));
     float phi = glm::dot(V, R);
     if (phi < 0)
-        return glm::vec3(0, 0, 0);
+        return computeLambertianModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
     return lightColor * hitInfo.material.ks * glm::pow(phi, hitInfo.material.shininess) ///ks 
         + computeLambertianModel(state,cameraDirection,lightDirection,lightColor,hitInfo);
 }
