@@ -191,6 +191,10 @@ int main(int argc, char** argv)
                 if (config.features.extra.enableDepthOfField) {
                     ImGui::Indent();
                     // Add DOF settings here, if necessary
+                    float minDepth = 0.0f;
+                    float maxDepth = 100.0f;
+                    ImGui::SliderFloat("Depth Range", &config.features.extra.depth, minDepth, maxDepth, "%.3f", 1.0f);
+
                     ImGui::Unindent();
                 }
                 ImGui::Checkbox("Motion blur", &config.features.extra.enableMotionBlur);

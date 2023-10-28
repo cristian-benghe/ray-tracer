@@ -16,8 +16,26 @@ void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, co
     if (!features.extra.enableDepthOfField) {
         return;
     }
-
-    // ...
+    float depth = features.extra.depth; //focalDistance
+    glm::vec3 focalPoint = camera.position() + depth * camera.lookAt(); //point that is in focus
+#ifdef NDEBUG // Enable multi threading in Release mode
+#pragma omp parallel for schedule(guided)
+#endif
+    for (int y = 0; y < screen.resolution().y; y++) {
+        for (int x = 0; x != screen.resolution().x; x++) {
+            // Assemble useful objects on a per-pixel basis; e.g. a per-thread sampler
+            // Note; we seed the sampler for consistenct behavior across frames
+            RenderState state = {
+                .scene = scene,
+                .features = features,
+                .bvh = bvh,
+                .sampler = { static_cast<uint32_t>(screen.resolution().y * x + y) }
+            };
+            auto rays = generatePixelRays(state, camera, { x, y }, screen.resolution());
+            auto L = renderRays(state, rays);
+            screen.setPixel(x, y, L);
+        }
+    }
 }
 
 // TODO; Extra feature

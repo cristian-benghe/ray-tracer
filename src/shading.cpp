@@ -162,7 +162,7 @@ glm::vec3 LinearGradient::sample(float ti) const
 
     float alpha = (ti - components[v[index1]].t) / (components[v[index2]].t - components[v[index1]].t);
 
-    return (1.0f - alpha) * comp1.color + alpha * comp2.color;
+    return alpha * comp1.color + (1.0f - alpha) * comp2.color;
 
 }
 
