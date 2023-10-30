@@ -109,16 +109,15 @@ glm::vec3 visibilityOfLightSampleTransparency(RenderState& state, const glm::vec
     float d;
     do 
     {
-        
-
         d = glm::length(lightPosition - pointOfIntersection);
         
         state.bvh.intersect(state, r, whereHit);
         drawRay(r,glm::vec3(0.0f));   
-        if(r.t < d) 
-            visibleLightColor = visibleLightColor * whereHit.material.kd * (1.0f - whereHit.material.transparency);
         if (whereHit.material.transparency == 1.0f)
             return visibleLightColor;
+        if(r.t < d) 
+            visibleLightColor = visibleLightColor * whereHit.material.kd * (1.0f - whereHit.material.transparency);
+        
 
         glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t + 10 * FLT_EPSILON);
         r = Ray(pointOfIntersection, glm::normalize(lightPosition - pointOfIntersection), std::numeric_limits<float>::max());

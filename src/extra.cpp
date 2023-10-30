@@ -4,6 +4,31 @@
 #include "recursive.h"
 #include "shading.h"
 #include <framework/trackball.h>
+#include <iostream>
+std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance)
+{
+    std::vector<Ray> rays;
+    // Calculate a vector perpendicular to the camera direction
+    glm::vec3 cameraUp = camera.up(); 
+    glm::vec3 cameraRight = -camera.left();
+
+    for (int i = 0; i < numRays; ++i) {
+        // Randomly sample points within the square aperture
+        float xOffset = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
+        float yOffset = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
+
+        // Calculate the lens position as being along the camera direction, and then
+        // offset perpendicularly by cameraRight and cameraUp
+        glm::vec3 dirr = glm::normalize(pixelDirection);
+
+        glm::vec3 pointt = dirr * focusDistance + pixelOrigin;
+
+        glm::vec3 origin = pixelOrigin + xOffset * cameraRight + yOffset * cameraUp;
+        rays.push_back(Ray { origin, glm::normalize(pointt - origin), std::numeric_limits<float>::max() });
+        //rays.push_back(Ray(camera.position(), glm::normalize(dir), std::numeric_limits<float>::max()));
+    }
+    return rays;
+}
 
 // TODO; Extra feature
 // Given the same input as for `renderImage()`, instead render an image with your own implementation
@@ -12,12 +37,18 @@
 // This method is not unit-tested, but we do expect to find it **exactly here**, and we'd rather
 // not go on a hunting expedition for your implementation, so please keep it here!
 void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, const Features& features, const Trackball& camera, Screen& screen)
-{
+{   
     if (!features.extra.enableDepthOfField) {
         return;
     }
     float depth = features.extra.depth; //focalDistance
-    glm::vec3 focalPoint = camera.position() + depth * camera.lookAt(); //point that is in focus
+    glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
+    glm::vec3 dir = camera.generateRay(position).direction;
+    glm::vec3 focalPoint = camera.position() + depth * dir; //point that is in focus
+    glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
+    float focalDistance = glm::length(focalPoint - camera.position());
+    glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
+
 #ifdef NDEBUG // Enable multi threading in Release mode
 #pragma omp parallel for schedule(guided)
 #endif
@@ -31,7 +62,12 @@ void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, co
                 .bvh = bvh,
                 .sampler = { static_cast<uint32_t>(screen.resolution().y * x + y) }
             };
-            auto rays = generatePixelRays(state, camera, { x, y }, screen.resolution());
+            glm::vec2 position = (glm::vec2(x,y) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
+             
+            auto rays = sampledRays(camera.generateRay(position).origin,
+                camera.generateRay(position).direction,
+                0.10f, 8, camera, features.extra.depth);
+
             auto L = renderRays(state, rays);
             screen.setPixel(x, y, L);
         }

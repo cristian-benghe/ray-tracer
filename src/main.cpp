@@ -6,6 +6,7 @@
 #include "sampler.h"
 #include "recursive.h"
 #include "screen.h"
+#include "extra.h"
 // Suppress warnings in third-party code.
 #include <framework/disable_all_warnings.h>
 DISABLE_WARNINGS_PUSH()
@@ -94,6 +95,26 @@ int main(int argc, char** argv)
                 case GLFW_KEY_S: {
                     debugBVHLeafId = std::max(0, debugBVHLeafId - 1);
 
+                } break;
+                case GLFW_KEY_T: {
+                    // Shoot a ray. Produce a ray from camera to the far plane.
+                    RenderState state = { .scene = scene, .features = config.features, .bvh = bvh, .sampler = { debugRaySeed } };
+                    auto tmp = window.getNormalizedCursorPos();
+                    auto pixel = glm::ivec2(tmp * glm::vec2(screen.resolution()));
+
+                    //float depth = config.features.extra.depth; // focalDistance
+                    //glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
+                    //glm::vec3 dir = camera.generateRay(position).direction;
+                    //glm::vec3 focalPoint = camera.position() + depth * dir; // point that is in focus
+                    //glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
+                    //float focalDistance = glm::length(focalPoint - camera.position());
+                    //glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
+                        
+                    glm::vec2 position = (glm::vec2(pixel.x, pixel.y) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
+
+                    debugRays = sampledRays(camera.generateRay(position).origin, 
+                        camera.generateRay(position).direction,
+                        0.1f, 15, camera, config.features.extra.depth);
                 } break;
                 case GLFW_KEY_ESCAPE: {
                     window.close();
@@ -191,8 +212,8 @@ int main(int argc, char** argv)
                 if (config.features.extra.enableDepthOfField) {
                     ImGui::Indent();
                     // Add DOF settings here, if necessary
-                    float minDepth = 0.0f;
-                    float maxDepth = 100.0f;
+                    float minDepth = 0.1f;
+                    float maxDepth = 30.0f;
                     ImGui::SliderFloat("Depth Range", &config.features.extra.depth, minDepth, maxDepth, "%.3f", 1.0f);
 
                     ImGui::Unindent();
@@ -388,6 +409,21 @@ int main(int argc, char** argv)
                         glDepthFunc(GL_LEQUAL);
                         RenderState state = { .scene = scene, .features = config.features, .bvh = bvh, .sampler = { debugRaySeed } };
                         (void)renderRays(state, debugRays);
+
+                        //auto tmp = window.getNormalizedCursorPos();
+                        //auto pixel = glm::ivec2(tmp * glm::vec2(screen.resolution()));
+
+                        float depth = config.features.extra.depth; // focalDistance
+                        glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
+                        glm::vec3 dir = camera.generateRay(position).direction;
+                        glm::vec3 focalPoint = camera.position() + depth * dir; // point that is in focus
+                        glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
+                        float focalDistance = glm::length(focalPoint - camera.position());
+                        glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
+
+                        drawSphere(glm::vec3(0,0,0), 0.02f, glm::vec3(0.5, 0.5, 0));
+
+
                         enableDebugDraw = false;
                     }
                 }
