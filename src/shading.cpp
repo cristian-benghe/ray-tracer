@@ -64,7 +64,7 @@ glm::vec3 computeLambertianModel(RenderState& state, const glm::vec3& cameraDire
     // Implement basic diffuse shading if you wish to use it
     float angle = glm::dot(glm::normalize(hitInfo.normal), glm::normalize(lightDirection));
 
-    return lightColor * sampleMaterialKd(state, hitInfo) * angle;
+    return lightColor * sampleMaterialKd(state, hitInfo) * glm::clamp(angle, 0.0f, 1.0f);
 }
 
 // TODO: Standard feature
