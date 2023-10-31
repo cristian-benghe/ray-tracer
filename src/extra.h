@@ -54,3 +54,5 @@ glm::vec3 sampleEnvironmentMap(RenderState& state, Ray ray);
 // For a description of the method's arguments, refer to 'bounding_volume_hierarchy.cpp'
 // NOTE: this method is unit-tested, so do not change the function signature.
 size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::span<BVHInterface::Primitive> primitives);
+
+std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance);

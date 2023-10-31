@@ -6,6 +6,7 @@
 #include "render.h"
 #include "scene.h"
 #include "shading.h"
+#include <iostream>
 // Suppress warnings in third-party code.
 #include <framework/disable_all_warnings.h>
 DISABLE_WARNINGS_PUSH()
@@ -24,9 +25,12 @@ DISABLE_WARNINGS_POP()
 // This method is unit-tested, so do not change the function signature.
 void sampleSegmentLight(const float& sample, const SegmentLight& light, glm::vec3& position, glm::vec3& color)
 {
+    
     // TODO: implement this function.
-    position = glm::vec3(0.0);
-    color = glm::vec3(0.0);
+    glm::vec3 length = light.endpoint1 - light.endpoint0;
+
+    position = sample * length + light.endpoint0;
+    color = (1 - sample) * light.color0 + sample * light.color1;
 }
 
 // TODO: Standard feature
@@ -41,9 +45,13 @@ void sampleSegmentLight(const float& sample, const SegmentLight& light, glm::vec
 void sampleParallelogramLight(const glm::vec2& sample, const ParallelogramLight& light, glm::vec3& position, glm::vec3& color)
 {
     // TODO: implement this function.
-    position = glm::vec3(0.0);
-    color = glm::vec3(0.0);
+    glm::vec3 c1 = (1 - sample.x) * light.color0 + sample.x * light.color1;
+    glm::vec3 c2 = (1 - sample.x) * light.color2 + sample.x * light.color3;
+    color = (1 - sample.y) * c1 + sample.y * c2;
+    position = light.v0 + light.edge01 * sample.x + light.edge02 * sample.y;
 }
+
+
 
 // TODO: Standard feature
 // Given a sampled position on some light, and the emitted color at this position, return whether
@@ -64,8 +72,16 @@ bool visibilityOfLightSampleBinary(RenderState& state, const glm::vec3& lightPos
     } else {
         // Shadows are enabled in the renderer
         // TODO: implement this function; currently, the light simply passes through
-        return true;
+        HitInfo whereHit;
+        glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t - 10 * FLT_EPSILON);
+
+        Ray r = Ray(pointOfIntersection, lightPosition - pointOfIntersection, std::numeric_limits<float>::max());
+        state.bvh.intersect(state, r, whereHit);
+        //glm::vec3 EPS = (FLT_EPSILON, FLT_EPSILON, FLT_EPSILON)
+           
+        return r.t + 2 * FLT_EPSILON >= 1.0f;
     }
+    
 }
 
 // TODO: Standard feature
@@ -86,7 +102,29 @@ bool visibilityOfLightSampleBinary(RenderState& state, const glm::vec3& lightPos
 glm::vec3 visibilityOfLightSampleTransparency(RenderState& state, const glm::vec3& lightPosition, const glm::vec3& lightColor, const Ray& ray, const HitInfo& hitInfo)
 {
     // TODO: implement this function; currently, the light simply passes through
-    return lightColor;
+    HitInfo whereHit;
+    glm::vec3 visibleLightColor = lightColor;
+    glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t - 10 * FLT_EPSILON);
+    Ray r = Ray(pointOfIntersection,lightPosition - pointOfIntersection,std::numeric_limits<float>::max());
+    float d;
+    do 
+    {
+        d = glm::length(lightPosition - pointOfIntersection);
+        
+        state.bvh.intersect(state, r, whereHit);
+        drawRay(r,glm::vec3(0.0f));   
+        if (whereHit.material.transparency == 1.0f)
+            return visibleLightColor;
+        if(r.t < d) 
+            visibleLightColor = visibleLightColor * whereHit.material.kd * (1.0f - whereHit.material.transparency);
+        
+
+        glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t + 10 * FLT_EPSILON);
+        r = Ray(pointOfIntersection, glm::normalize(lightPosition - pointOfIntersection), std::numeric_limits<float>::max());
+       
+    } while (r.t < d);
+
+    return visibleLightColor;
 }
 
 // TODO: Standard feature
@@ -108,7 +146,22 @@ glm::vec3 computeContributionPointLight(RenderState& state, const PointLight& li
     glm::vec3 p = ray.origin + ray.t * ray.direction;
     glm::vec3 l = glm::normalize(light.position - p);
     glm::vec3 v = -ray.direction;
-    return computeShading(state, v, l, light.color, hitInfo);
+    //return computeShading(state, v, l, light.color, hitInfo);
+
+    // Calculate the direction from the intersection point to the light source
+  
+    glm::vec3 color = light.color;
+    if (true) {
+        color = visibilityOfLightSample(state, light.position, light.color, ray, hitInfo);
+
+        glm::vec3 shading = computeShading(state, v, l, color, hitInfo);
+
+        return light.color * shading;
+    } 
+    
+    return glm::vec3(0.0f); //in shadow
+
+
 }
 
 // TODO: Standard feature
@@ -134,7 +187,23 @@ glm::vec3 computeContributionSegmentLight(RenderState& state, const SegmentLight
     // - sample the segment light
     // - test the sample's visibility
     // - then evaluate the phong model
-    return glm::vec3(0);
+    glm::vec3 ans = glm::vec3(0, 0, 0);
+    for (int i = 0; i < numSamples; ++i) {
+        glm::vec3 position, color;
+
+        sampleSegmentLight(state.sampler.next_1d(), light, position, color);
+
+        
+
+        if (true) {
+            color = visibilityOfLightSample(state, position, color, ray, hitInfo);
+            glm::vec3 contribution = computeShading(state, -ray.direction, glm::normalize(position - ray.origin+ray.direction*ray.t), color, hitInfo);
+
+            ans += contribution;
+        }
+    }
+
+    return ans / float(numSamples);
 }
 
 // TODO: Standard feature
@@ -161,7 +230,22 @@ glm::vec3 computeContributionParallelogramLight(RenderState& state, const Parall
     // - sample the parallellogram light
     // - test the sample's visibility
     // - then evaluate the phong model
-    return glm::vec3(0);
+    glm::vec3 ans(0.0f);
+
+    for (int i = 0; i < numSamples; ++i) {
+        glm::vec3 position, color;
+        glm::vec2 x = state.sampler.next_2d();
+
+        sampleParallelogramLight(x, light, position, color);
+
+        color = visibilityOfLightSample(state, position, color, ray, hitInfo);
+        
+        glm::vec3 contribution = computeShading(state, -ray.direction, glm::normalize(position - ray.t*ray.direction+ray.origin), color, hitInfo);
+
+        ans += contribution;
+        
+    }
+    return ans/float(numSamples);
 }
 
 // This function is provided as-is. You do not have to implement it.
