@@ -4,7 +4,6 @@
 #include "recursive.h"
 #include "shading.h"
 #include <framework/trackball.h>
-#include <iostream>
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance)
 {
     std::vector<Ray> rays;
@@ -13,19 +12,15 @@ std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, fl
     glm::vec3 cameraRight = -camera.left();
 
     for (int i = 0; i < numRays; ++i) {
-        // Randomly sample points within the square aperture
-        float xOffset = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
-        float yOffset = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
+        float offset_x = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
+        float offset_y = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
 
-        // Calculate the lens position as being along the camera direction, and then
-        // offset perpendicularly by cameraRight and cameraUp
         glm::vec3 dirr = glm::normalize(pixelDirection);
 
         glm::vec3 pointt = dirr * focusDistance + pixelOrigin;
 
-        glm::vec3 origin = pixelOrigin + xOffset * cameraRight + yOffset * cameraUp;
+        glm::vec3 origin = pixelOrigin + offset_x * cameraRight + offset_y * cameraUp;
         rays.push_back(Ray { origin, glm::normalize(pointt - origin), std::numeric_limits<float>::max() });
-        //rays.push_back(Ray(camera.position(), glm::normalize(dir), std::numeric_limits<float>::max()));
     }
     return rays;
 }
