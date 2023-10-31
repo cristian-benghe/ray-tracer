@@ -1,5 +1,6 @@
 #include "render.h"
 #include "texture.h"
+#include <algorithm>
 #include <cmath>
 #include <fmt/core.h>
 #include <glm/geometric.hpp>
@@ -42,14 +43,14 @@ glm::vec3 computeShading(RenderState& state, const glm::vec3& cameraDirection, c
 
     if (state.features.enableShading) {
         switch (state.features.shadingModel) {
-            case ShadingModel::Lambertian:
-                return computeLambertianModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
-            case ShadingModel::Phong:
-                return computePhongModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
-            case ShadingModel::BlinnPhong:
-                return computeBlinnPhongModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
-            case ShadingModel::LinearGradient:
-                return computeLinearGradientModel(state, cameraDirection, lightDirection, lightColor, hitInfo, gradient);
+        case ShadingModel::Lambertian:
+            return computeLambertianModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
+        case ShadingModel::Phong:
+            return computePhongModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
+        case ShadingModel::BlinnPhong:
+            return computeBlinnPhongModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
+        case ShadingModel::LinearGradient:
+            return computeLinearGradientModel(state, cameraDirection, lightDirection, lightColor, hitInfo, gradient);
         };
     }
 
@@ -63,7 +64,7 @@ glm::vec3 computeLambertianModel(RenderState& state, const glm::vec3& cameraDire
     // Implement basic diffuse shading if you wish to use it
     float angle = glm::dot(glm::normalize(hitInfo.normal), glm::normalize(lightDirection));
 
-    return lightColor * sampleMaterialKd(state,hitInfo) * angle;
+    return lightColor * sampleMaterialKd(state, hitInfo) * angle;
 }
 
 // TODO: Standard feature
@@ -91,8 +92,8 @@ glm::vec3 computePhongModel(RenderState& state, const glm::vec3& cameraDirection
     float phi = glm::dot(V, R);
     if (phi < 0)
         return computeLambertianModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
-    return lightColor * hitInfo.material.ks * glm::pow(phi, hitInfo.material.shininess) ///ks 
-        + computeLambertianModel(state,cameraDirection,lightDirection,lightColor,hitInfo);
+    return lightColor * hitInfo.material.ks * glm::pow(phi, hitInfo.material.shininess) /// ks
+        + computeLambertianModel(state, cameraDirection, lightDirection, lightColor, hitInfo);
 }
 
 // TODO: Standard feature
@@ -146,13 +147,11 @@ glm::vec3 LinearGradient::sample(float ti) const
 
     for (int i = 0; i < components.size() - 1; ++i)
         for (int j = i + 1; j < components.size(); ++j)
-           if (components[v[i]].t > components[v[j]].t) {
-               std::swap(v[i], v[j]);
-           }
-                    
-                
+            if (components[v[i]].t > components[v[j]].t) {
+                std::swap(v[i], v[j]);
+            }
 
-    while (index2 < components.size()-1 && ti > components[v[index2]].t) {
+    while (index2 < components.size() - 1 && ti > components[v[index2]].t) {
         index1 = index2;
         index2++;
     }
@@ -190,5 +189,4 @@ glm::vec3 computeLinearGradientModel(RenderState& state, const glm::vec3& camera
     glm::vec3 interpolatedColor = gradient.sample(cos_theta);
 
     return interpolatedColor * lightColor * cos_theta;
-    
 }

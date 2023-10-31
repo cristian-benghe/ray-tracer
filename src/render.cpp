@@ -79,13 +79,25 @@ std::vector<Ray> generatePixelRays(RenderState& state, const Trackball& camera, 
 // - screenResolution; x/y dimensions of the output image
 // - return;           a vector of camera rays into the pixel
 // This method is unit-tested, so do not change the function signature.
+// Generate numSamples camera rays uniformly distributed across the pixel. Use
+// Hint; use `state.sampler.next*d()` to generate random samples in [0, 1).
 std::vector<Ray> generatePixelRaysMultisampled(RenderState& state, const Trackball& camera, glm::ivec2 pixel, glm::ivec2 screenResolution)
 {
-    // Generate numSamples camera rays uniformly distributed across the pixel. Use
-    // Hint; use `state.sampler.next*d()` to generate random samples in [0, 1).
     auto numSamples = state.features.numPixelSamples;
     std::vector<Ray> rays;
-    // ...
+    
+    for (int i = 0; i < numSamples; i++) {
+        glm::vec2 shift = state.sampler.next_2d();
+        shift.x -= 0.5f;
+        shift.y -= 0.5f;
+        shift *= (1 - std::numeric_limits<float>::epsilon());
+
+        float x = (2.0f * (pixel.x + 0.5f + shift.x)) / screenResolution.x - 1.0f;
+        float y = (2.0f * (pixel.y + 0.5f + shift.y)) / screenResolution.y - 1.0f;
+
+        rays.push_back(camera.generateRay(glm::vec2(x, y)));
+    }
+
     return rays;
 }
 
@@ -100,12 +112,27 @@ std::vector<Ray> generatePixelRaysMultisampled(RenderState& state, const Trackba
 // - return;           a vector of camera rays into the pixel
 // This method is not unit-tested, but we do expect to find it **exactly here**, and we'd rather
 // not go on a hunting expedition for your implementation, so please keep it here!
+// Generate numSamples * numSamples camera rays as jittered samples across the pixel.
+// Hint; use `state.sampler.next*d()` to generate random samples in [0, 1).
 std::vector<Ray> generatePixelRaysStratified(RenderState& state, const Trackball& camera, glm::ivec2 pixel, glm::ivec2 screenResolution)
 {
-    // Generate numSamples * numSamples camera rays as jittered samples across the pixel.
-    // Hint; use `state.sampler.next*d()` to generate random samples in [0, 1).
+    
     auto numSamples = static_cast<uint32_t>(std::round(std::sqrt(float(state.features.numPixelSamples))));
     std::vector<Ray> rays;
-    // ...
+    
+    float pixelWidth = 1.0f / screenResolution.x;
+    float pixelHeight = 1.0f / screenResolution.y;
+    //float cellWidth = pixelWidth / numSamples;
+    //float cellHeight = pixelHeight / numSamples;
+
+    for (uint32_t i = 0; i < numSamples; i++) {
+        for (uint32_t j = 0; j < numSamples; j++) {
+            const float x = pixelWidth * (pixel.x + (i + state.sampler.next_1d()) / numSamples - 0.5f) * 2.0f - 1.0f;
+            const float y = pixelHeight * (pixel.y + (j + state.sampler.next_1d()) / numSamples - 0.5f) * 2.0f - 1.0f;
+
+            rays.push_back(camera.generateRay(glm::vec2(x, y)));
+        }
+    }
+
     return rays;
 }

@@ -1,17 +1,16 @@
 #include "bvh.h"
 #include "draw.h"
+#include "extra.h"
 #include "interpolate.h"
 #include "intersect.h"
 #include "render.h"
 #include "scene.h"
-#include "extra.h"
 #include "texture.h"
 #include <algorithm>
 #include <bit>
 #include <chrono>
 #include <framework/opengl_includes.h>
 #include <iostream>
-
 
 // Helper method to fill in hitInfo object. This can be safely ignored (or extended).
 // Note: many of the functions in this helper tie in to standard/extra features you will have
@@ -145,7 +144,7 @@ uint32_t computeAABBLongestAxis(const AxisAlignedBox& aabb)
 
 // TODO: Standard feature
 // Given a range of BVH triangles, sort these along a specified axis based on their geometric centroid.
-// Then, find and return the split index in the range, such that the subrange containing the first element 
+// Then, find and return the split index in the range, such that the subrange containing the first element
 // of the list is at least as big as the other, and both differ at most by one element in size.
 // Hint: you should probably reuse `computePrimitiveCentroid()`
 // - aabb;       the axis-aligned bounding box around the given triangle range
