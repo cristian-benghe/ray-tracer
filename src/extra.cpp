@@ -47,7 +47,6 @@ void postprocessImageWithBloom(const Scene& scene, const Features& features, con
     // ...
 }
 
-
 // TODO; Extra feature
 // Given a camera ray (or reflected camera ray) and an intersection, evaluates the contribution of a set of
 // glossy reflective rays, recursively evaluating renderRay(..., depth + 1) along each ray, and adding the
@@ -62,8 +61,40 @@ void postprocessImageWithBloom(const Scene& scene, const Features& features, con
 void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInfo, glm::vec3& hitColor, int rayDepth)
 {
     // Generate an initial specular ray, and base secondary glossies on this ray
-    // auto numSamples = state.features.extra.numGlossySamples;
-    // ...
+    auto numSamples = state.features.extra.numGlossySamples;
+
+    Ray reflectedRay = generateReflectionRay(ray, hitInfo);
+
+    glm::vec3 u, v;
+    glm::vec3 r = ray.direction;
+
+    u = glm::cross(glm::vec3(0, 1, 0), r);
+    if (r == glm::vec3(0,1,0))
+        u = glm::cross(glm::vec3(1, 0, 0), r);
+    v = glm::cross(r, u);
+
+    u = glm::normalize(u);
+    v = glm::normalize(v);
+    float radius = 1.0f; 
+    
+    glm::vec3 computedGlossyColor = glm::vec3(0);
+
+    for (int i = 0; i < numSamples; ++i) {
+        float theta = (static_cast<float>(rand()) / RAND_MAX) * 2 * glm::pi<float>();
+
+        float randomSmallerRadius = static_cast<double>(rand()) / RAND_MAX * radius;
+
+        glm::vec3 r_prime_direction = glm::normalize(reflectedRay.direction + hitInfo.material.shininess / 64.0f * 
+            (u * (randomSmallerRadius * cos(theta)) + v * (randomSmallerRadius * sin(theta))));
+
+        Ray perturbedRay;
+        perturbedRay.origin = reflectedRay.origin;
+        perturbedRay.direction = r_prime_direction;
+        perturbedRay.t = std::numeric_limits<float>::max();
+        computedGlossyColor += renderRay(state, perturbedRay, rayDepth + 1);
+    }
+    
+    hitColor += computedGlossyColor / (float) numSamples * hitInfo.material.ks;
 }
 
 // TODO; Extra feature
