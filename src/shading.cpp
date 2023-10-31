@@ -121,7 +121,7 @@ glm::vec3 computeBlinnPhongModel(RenderState& state, const glm::vec3& cameraDire
     if (delta < 0)
         return glm::vec3(0, 0, 0);
 
-    return lightColor * hitInfo.material.ks * glm::pow(delta, hitInfo.material.shininess) +
+    return lightColor * hitInfo.material.ks * glm::pow(delta, hitInfo.material.shininess)
         + computeLambertianModel(state,cameraDirection,lightDirection,lightColor,hitInfo);
 }
 
