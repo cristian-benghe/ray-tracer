@@ -19,36 +19,38 @@
 // Note, the center of the first pixel is at image coordinates (0.5, 0.5)
 glm::vec3 sampleTextureNearest(const Image& image, const glm::vec2& texCoord)
 {
-    int i = std::floor(texCoord.x * (image.width));
-    int j = std::floor(texCoord.y * (image.height));
+    glm::vec2 texCoordSafe = glm::clamp(texCoord, glm::vec2(0.0f), glm::vec2(1.0f) - glm::vec2(std::numeric_limits<float>::epsilon()));
 
-    i = std::clamp(i, 0, image.width - 1);
-    j = std::clamp(j, 0, image.height - 1);
+    int i = static_cast<int>(std::floor(image.width * texCoordSafe.x));
+    int j = static_cast<int>(std::floor(image.height * (1.0f - texCoordSafe.y)));
 
     int index = j * image.width + i;
     return image.pixels[index];
 }
 
-glm::vec2 calculateBoundary(const float p)
+glm::vec2 calculateBoundary(const float p, const int maxBoundary)
 {
-    float a, b;
+    float lowerBound = 0.0f;
+    float upperBound = 0.0f;
     if (std::abs(p - std::floor(p)) > std::abs(p - std::ceil(p))) {
-        a = std::floor(p) + 0.5;
-        b = std::ceil(p) + 0.5;
-    }
-    else if (std::abs(p - std::ceil(p)) > std::abs(p - std::floor(p))) {
-        a = std::floor(p) - 0.5;
-        b = std::ceil(p) - 0.5;
+        lowerBound = std::floor(p) + 0.5;
+        upperBound = std::ceil(p) + 0.5;
+    } else if (std::abs(p - std::ceil(p)) > std::abs(p - std::floor(p))) {
+        lowerBound = std::floor(p) - 0.5;
+        upperBound = std::ceil(p) - 0.5;
     }
 
-    return glm::vec2{a, b};
+    glm::vec2 bothBoundaries = glm::vec2 { lowerBound, upperBound };
+    //glm::vec2 bothBoundariesSafe = glm::clamp(bothBoundaries, glm::vec2(0.0f), glm::vec2(maxBoundary) - glm::vec2(std::numeric_limits<float>::epsilon()));
+
+    return bothBoundaries;
 }
 
-glm::vec4 boundaryPoints(const float x, const float y) 
+glm::vec4 boundaryPoints(const float i, const float j, const int imageWidth, const int imageHeight)
 {
-    glm::vec2 xAxis = calculateBoundary(x);
-    glm::vec2 yAxis = calculateBoundary(y);
-    return glm::vec4 { xAxis.x, xAxis.y, yAxis.x, yAxis.y };
+    glm::vec2 iAxis = calculateBoundary(i, imageWidth);
+    glm::vec2 jAxis = calculateBoundary(j, imageHeight);
+    return glm::vec4 { iAxis.x, iAxis.y, jAxis.x, jAxis.y };
 }
 
 // TODO: Standard feature
@@ -68,39 +70,36 @@ glm::vec4 boundaryPoints(const float x, const float y)
 // Note, the center of the first pixel is at image coordinates (0.5, 0.5)
 glm::vec3 sampleTextureBilinear(const Image& image, const glm::vec2& texCoord)
 {
-    float i = texCoord.x * (image.width);
-    float j = texCoord.y * (image.height);
+    glm::vec2 texCoordSafe = glm::clamp(texCoord, glm::vec2(0.0f), glm::vec2(1.0f) - glm::vec2(std::numeric_limits<float>::epsilon()));
 
-    //i = std::max(0.0f, std::min(i, static_cast<float>(image.width - 1)));
-    //j = std::max(0.0f, std::min(j, static_cast<float>(image.height - 1)));
+    float i = image.width * texCoordSafe.x;
+    float j = image.height * (1.0f - texCoordSafe.y);
 
-    i = std::clamp(i, 0.0f, static_cast<float>(image.width - 1));
-    j = std::clamp(j, 0.0f, static_cast<float>(image.height - 1));
-
-    glm::vec4 c = boundaryPoints(i, j);
+    glm::vec4 c = boundaryPoints(i, j, image.width, image.height);
     // lower x boundary     - c.x
     // higher x boundary    - c.y
     // lower y boundary     - c.z
     // higher y boundary    - c.w
     // lower, lower is (0, 0) -> upper left corner
-    
+
     float alpha = i - c.x;
     float beta = c.w - j;
 
     // int index = j * image.width + i;
-    int indexBL = std::floor(c.w) * image.width + std::floor(c.x);
+    int indexBL = static_cast<int>(std::floor(c.w)) * image.width + static_cast<int>(std::floor(c.x));
     glm::vec3 bottomLeft = image.pixels[indexBL];
-    int indexBR = std::floor(c.w) * image.width + std::floor(c.y);
+    int indexBR = static_cast<int>(std::floor(c.w)) * image.width + static_cast<int>(std::floor(c.y));
     glm::vec3 bottomRight = image.pixels[indexBR];
-    int indexUL = std::floor(c.z) * image.width + std::floor(c.x);
+    int indexUL = static_cast<int>(std::floor(c.z)) * image.width + static_cast<int>(std::floor(c.x));
     glm::vec3 upperLeft = image.pixels[indexUL];
-    int indexUR = std::floor(c.z) * image.width + std::floor(c.y);
+    int indexUR = static_cast<int>(std::floor(c.z)) * image.width + static_cast<int>(std::floor(c.y));
     glm::vec3 upperRight = image.pixels[indexUR];
 
-    glm::vec3 finalColor = (1 - alpha) * (1 - beta) * bottomLeft + 
+    glm::vec3 finalColor = 
+        (1 - alpha) * (1 - beta) * bottomLeft + 
         alpha * (1 - beta) * bottomRight + 
         (1 - alpha) * beta * upperLeft + 
         alpha * beta * upperRight;
-    
+
     return finalColor;
 }

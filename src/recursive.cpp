@@ -1,8 +1,8 @@
 #include "recursive.h"
-#include "draw.h"
 #include "bvh_interface.h"
-#include "intersect.h"
+#include "draw.h"
 #include "extra.h"
+#include "intersect.h"
 #include "light.h"
 
 // This function is provided as-is. You do not have to implement it.
@@ -73,9 +73,7 @@ glm::vec3 renderRay(RenderState& state, Ray ray, int rayDepth)
 //       if you use glm::reflect, you will not get points for this method!
 Ray generateReflectionRay(Ray ray, HitInfo hitInfo)
 {
-    glm::vec3 reflectedDirection = 
-        glm::normalize(ray.direction) - 2.0f * glm::dot(glm::normalize(ray.direction), glm::normalize(hitInfo.normal)) 
-        * glm::normalize(hitInfo.normal);
+    glm::vec3 reflectedDirection = glm::normalize(ray.direction) - 2.0f * glm::dot(glm::normalize(ray.direction), glm::normalize(hitInfo.normal)) * glm::normalize(hitInfo.normal);
     float offset = 1e-5f;
     glm::vec3 reflectedOrigin = ray.origin + ray.direction * (ray.t - offset);
     return Ray { reflectedOrigin, reflectedDirection, std::numeric_limits<float>::max() };

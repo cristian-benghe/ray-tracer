@@ -85,15 +85,15 @@ std::vector<Ray> generatePixelRaysMultisampled(RenderState& state, const Trackba
 {
     auto numSamples = state.features.numPixelSamples;
     std::vector<Ray> rays;
-    
+
     for (int i = 0; i < numSamples; i++) {
         glm::vec2 shift = state.sampler.next_2d();
         shift.x -= 0.5f;
         shift.y -= 0.5f;
         shift *= (1 - std::numeric_limits<float>::epsilon());
 
-        float x = (2.0f * (pixel.x + 0.5f + shift.x)) / screenResolution.x - 1.0f;
-        float y = (2.0f * (pixel.y + 0.5f + shift.y)) / screenResolution.y - 1.0f;
+        float x = (pixel.x + 0.5f + shift.x) / screenResolution.x * 2.0f - 1.0f;
+        float y = (pixel.y + 0.5f + shift.y) / screenResolution.y * 2.0f - 1.0f;
 
         rays.push_back(camera.generateRay(glm::vec2(x, y)));
     }
@@ -116,19 +116,19 @@ std::vector<Ray> generatePixelRaysMultisampled(RenderState& state, const Trackba
 // Hint; use `state.sampler.next*d()` to generate random samples in [0, 1).
 std::vector<Ray> generatePixelRaysStratified(RenderState& state, const Trackball& camera, glm::ivec2 pixel, glm::ivec2 screenResolution)
 {
-    
+
     auto numSamples = static_cast<uint32_t>(std::round(std::sqrt(float(state.features.numPixelSamples))));
     std::vector<Ray> rays;
-    
-    float pixelWidth = 1.0f / screenResolution.x;
-    float pixelHeight = 1.0f / screenResolution.y;
-    //float cellWidth = pixelWidth / numSamples;
-    //float cellHeight = pixelHeight / numSamples;
 
     for (uint32_t i = 0; i < numSamples; i++) {
         for (uint32_t j = 0; j < numSamples; j++) {
-            const float x = pixelWidth * (pixel.x + (i + state.sampler.next_1d()) / numSamples - 0.5f) * 2.0f - 1.0f;
-            const float y = pixelHeight * (pixel.y + (j + state.sampler.next_1d()) / numSamples - 0.5f) * 2.0f - 1.0f;
+
+            glm::vec2 shiftJittered(
+                (i + state.sampler.next_1d()) / numSamples,
+                (j + state.sampler.next_1d()) / numSamples);
+
+            const float x = (pixel.x + shiftJittered.x) / screenResolution.x * 2.0f - 1.0f;
+            const float y = (pixel.y + shiftJittered.y) / screenResolution.y * 2.0f - 1.0f;
 
             rays.push_back(camera.generateRay(glm::vec2(x, y)));
         }
