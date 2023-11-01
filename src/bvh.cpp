@@ -119,6 +119,7 @@ float min(float x, float y, float z)
 // This method is unit-tested, so do not change the function signature.
 AxisAlignedBox computePrimitiveAABB(const BVHInterface::Primitive primitive)
 {
+<<<<<<< HEAD
     glm::vec3 v0 = primitive.v0.position;
     glm::vec3 v1 = primitive.v1.position;
     glm::vec3 v2 = primitive.v2.position;
@@ -129,15 +130,35 @@ AxisAlignedBox computePrimitiveAABB(const BVHInterface::Primitive primitive)
     float maxy = max(v0.y, v1.y, v2.y);
     float maxz = max(v0.z, v1.z, v2.z);
     return { .lower = { minx, miny, minz }, .upper = { maxx, maxy, maxz } };
+=======
+
+    glm::vec3 v0 = primitive.v0.position;
+    glm::vec3 v1 = primitive.v1.position;
+    glm::vec3 v2 = primitive.v2.position;
+    float lowerX = glm::min(v0.x, v1.x);
+    lowerX = glm::min(lowerX, v2.x);
+    float lowerY = glm::min(v0.y, v1.y);
+    lowerY = glm::min(lowerY, v2.y);
+    float lowerZ = glm::min(v0.z, v1.z);
+    lowerZ = glm::min(lowerZ, v2.z);
+    float upperX = glm::max(v0.x, v1.x);
+    upperX = glm::max(upperX, v2.x);
+    float upperY = glm::max(v0.y, v1.y);
+    upperY = glm::max(upperY, v2.y);
+    float upperZ = glm::max(v0.z, v1.z);
+    upperZ = glm::max(upperZ, v2.z);
+    return { .lower = glm::vec3(lowerX, lowerY, lowerZ), .upper = glm::vec3(upperX, upperY, upperZ) };
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
 }
 
 // TODO: Standard feature
 // Given a range of BVH triangles, compute an axis-aligned bounding box around the range.
 // - primitive; a contiguous range of triangles to be stored in the BVH
-// - return;    a single axis-aligned bounding box around the entire set of triangles
+// - return; a single axis-aligned bounding box around the entire set of triangles
 // This method is unit-tested, so do not change the function signature.
 AxisAlignedBox computeSpanAABB(std::span<const BVHInterface::Primitive> primitives)
 {
+<<<<<<< HEAD
     std::vector<AxisAlignedBox> boxes;
     for (int i = 0; i < primitives.size(); i++) {
         boxes.push_back(computePrimitiveAABB(primitives[i]));
@@ -164,28 +185,47 @@ AxisAlignedBox computeSpanAABB(std::span<const BVHInterface::Primitive> primitiv
             maxz = cur.upper.z;
     }
     return { .lower = { minx, miny, minz }, .upper = { maxx, maxy, maxz } };
+=======
+    glm::vec3 lowest(std::numeric_limits<float>::max());
+    glm::vec3 highest(std::numeric_limits<float>::lowest());
+
+    for (const BVH::Primitive& primitive : primitives) {
+        lowest = glm::min(lowest, computePrimitiveAABB(primitive).lower);
+        highest = glm::max(highest, computePrimitiveAABB(primitive).upper);
+    }
+
+    return { .lower = lowest, .upper = highest };
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
 }
 
 // TODO: Standard feature
 // Given a BVH triangle, compute the geometric centroid of the triangle
 // - primitive; a single triangle to be stored in the BVH
-// - return;    the geometric centroid of the triangle's vertices
+// - return; the geometric centroid of the triangle's vertices
 // This method is unit-tested, so do not change the function signature.
 glm::vec3 computePrimitiveCentroid(const BVHInterface::Primitive primitive)
 {
+<<<<<<< HEAD
     return { (primitive.v0.position.x + primitive.v1.position.x + primitive.v2.position.x) / 3,
         (primitive.v0.position.y + primitive.v1.position.y + primitive.v2.position.y) / 3,
         (primitive.v0.position.z + primitive.v1.position.z + primitive.v2.position.z) / 3 };
+=======
+    glm::vec3 v0 = primitive.v0.position;
+    glm::vec3 v1 = primitive.v1.position;
+    glm::vec3 v2 = primitive.v2.position;
+    return (v0 + v1 + v2) / 3.0f;
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
 }
 
 // TODO: Standard feature
 // Given an axis-aligned bounding box, compute the longest axis; x = 0, y = 1, z = 2.
 // - aabb;   the input axis-aligned bounding box
 // - return; 0 for the x-axis, 1 for the y-axis, 2 for the z-axis
-//           if several axes are equal in length, simply return the first of these
+// if several axes are equal in length, simply return the first of these
 // This method is unit-tested, so do not change the function signature.
 uint32_t computeAABBLongestAxis(const AxisAlignedBox& aabb)
 {
+<<<<<<< HEAD
     float x = aabb.upper.x - aabb.lower.x;
     float y = aabb.upper.y - aabb.lower.y;
     float z = aabb.upper.z - aabb.lower.z;
@@ -193,6 +233,21 @@ uint32_t computeAABBLongestAxis(const AxisAlignedBox& aabb)
         return 0;
     if (max(x, y, z) == y)
         return 1;
+=======
+    glm::vec3 diff = aabb.upper - aabb.lower;
+    if (diff.x >= diff.y) {
+        if (diff.x >= diff.z) {
+            return 0;
+        }
+
+        return 2;
+    }
+
+    else if (diff.y >= diff.z) {
+        return 1;
+    }
+
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
     return 2;
 }
 
@@ -225,6 +280,7 @@ size_t splitPrimitivesByMedian(const AxisAlignedBox& aabb, uint32_t axis, std::s
         return centroids[a] < centroids[b];
     });
 
+<<<<<<< HEAD
     std::vector<BVHInterface::Primitive> sortedPrimitives(primitives.size());
     for (size_t i = 0; i < index.size(); i++) {
         sortedPrimitives[i] = primitives[index[i]];
@@ -232,6 +288,28 @@ size_t splitPrimitivesByMedian(const AxisAlignedBox& aabb, uint32_t axis, std::s
     std::copy(sortedPrimitives.begin(), sortedPrimitives.end(), primitives.begin());
 
     return std::floor((primitives.size() - 1) / 2);
+=======
+    std::vector<Primitive> centroids;
+    centroids.assign(primitives.begin(), primitives.end());
+    if (axis == 0)
+        std::sort(centroids.begin(), centroids.end(), [](Primitive p0, Primitive p1) {
+            return computePrimitiveCentroid(p0).x < computePrimitiveCentroid(p1).x;
+        });
+    else if (axis == 1)
+        std::sort(centroids.begin(), centroids.end(), [](Primitive p0, Primitive p1) {
+            return computePrimitiveCentroid(p0).y < computePrimitiveCentroid(p1).y;
+        });
+    else if (axis == 2)
+        std::sort(centroids.begin(), centroids.end(), [](Primitive p0, Primitive p1) {
+            return computePrimitiveCentroid(p0).z < computePrimitiveCentroid(p1).z;
+        });
+
+    for (int i = 0; i < primitives.size(); i++) {
+        primitives[i] = centroids[i];
+    }
+
+    return std::round(centroids.size() / 2.0f) - 1;
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
 }
 
 // TODO: Standard feature
@@ -279,6 +357,7 @@ bool intersectRayWithBVH(RenderState& state, const BVHInterface& bvh, Ray& ray, 
         //
         // Note that it is entirely possible for a ray to hit a leaf node, but not its primitives,
         // and it is likewise possible for a ray to hit both children of a node.
+<<<<<<< HEAD
         std::vector<BVH::Node> stack;
         stack.push_back(nodes[BVH::RootIndex]);
         while (!stack.size() == 0) {
@@ -302,6 +381,40 @@ bool intersectRayWithBVH(RenderState& state, const BVHInterface& bvh, Ray& ray, 
                 if (intersectRayWithShape(right.aabb, ray))
                     stack.push_back(right);
                 ray.t = t;
+=======
+        std::vector<BVHInterface::Node> tNodes;
+        tNodes.reserve(256);
+        BVHInterface::Node node = nodes[0];
+        BVHInterface::Primitive p;
+        tNodes.push_back(node);
+        float t;
+        while (!tNodes.empty()) {
+            t = ray.t;
+            if (intersectRayWithShape(node.aabb, ray)) {
+                ray.t = t;
+                if (node.isLeaf()) {
+                    for (int j = 0; j < node.primitiveCount(); j++) {
+                        p = primitives[node.primitiveOffset() + j];
+                        if (intersectRayWithTriangle(p.v0.position, p.v1.position, p.v2.position, ray, hitInfo)) {
+                            updateHitInfo(state, p, ray, hitInfo);
+                            is_hit = true;
+                        }
+                    }
+
+                    node = tNodes.back();
+                    tNodes.pop_back();
+                }
+
+                else {
+                    tNodes.push_back(nodes[node.rightChild()]);
+                    node = nodes[node.leftChild()];
+                }
+            }
+
+            else {
+                node = tNodes.back();
+                tNodes.pop_back();
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
             }
         }
 
@@ -344,6 +457,11 @@ BVH::Node BVH::buildLeafData(const Scene& scene, const Features& features, const
     node.data[1] = count;
     node.aabb = aabb;
 
+    node.aabb = aabb;
+    uint32_t data0 = 1u << 31;
+    data0 += m_primitives.size();
+    node.data = { data0, static_cast<uint32_t>(primitives.size()) };
+
     // Copy the current set of primitives to the back of the primitives vector
     std::copy(primitives.begin(), primitives.end(), std::back_inserter(m_primitives));
 
@@ -364,9 +482,16 @@ BVH::Node BVH::buildNodeData(const Scene& scene, const Features& features, const
 
     Node node;
     // TODO fill in the node's data; refer to `bvh_interface.h` for details
+<<<<<<< HEAD
     node.aabb = aabb;
     node.data[0] = leftChildIndex;
     node.data[1] = rightChildIndex;
+=======
+
+    node.aabb = aabb;
+    node.data = { leftChildIndex, rightChildIndex };
+
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
     return node;
 }
 
@@ -433,6 +558,26 @@ void BVH::buildRecursive(const Scene& scene, const Features& features, std::span
 
     // Just configure the current node as a giant leaf for now
     // m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
+<<<<<<< HEAD
+=======
+
+    AxisAlignedBox aabb = computeSpanAABB(primitives);
+
+    if (primitives.size() <= LeafSize) {
+        m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
+    } else {
+        if (!features.extra.enableBvhSahBinning) {
+            size_t index = splitPrimitivesByMedian(aabb, computeAABBLongestAxis(aabb), primitives);
+            uint32_t i0 = nextNodeIdx();
+            uint32_t i1 = nextNodeIdx();
+            m_nodes[nodeIndex] = buildNodeData(scene, features, aabb, i0, i1);
+            std::span<Primitive> leftSubspan = primitives.subspan(0, index + 1);
+            std::span<Primitive> rightSubspan = primitives.subspan(index + 1);
+            buildRecursive(scene, features, leftSubspan, i0);
+            buildRecursive(scene, features, rightSubspan, i1);
+        }
+    }
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
 }
 
 // TODO: Standard feature, or part of it
@@ -440,6 +585,7 @@ void BVH::buildRecursive(const Scene& scene, const Features& features, std::span
 // You are free to modify this function's signature, as long as the constructor builds a BVH
 void BVH::buildNumLevels()
 {
+<<<<<<< HEAD
     Node root = m_nodes[RootIndex];
     int counter = 0;
     std::vector<Node> children;
@@ -459,18 +605,47 @@ void BVH::buildNumLevels()
         children = nextLevel;
     }
     m_numLevels = counter;
+=======
+    m_numLevels = 0;
+    Node node = nodes()[0];
+    while (!node.isLeaf()) {
+        m_numLevels++;
+        node = nodes()[node.leftChild()];
+    }
+
+    m_numLevels++;
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
 }
 
 // Compute the nr. of leaves in your hierarchy after construction; useful for `debugDrawLeaf()`
 // You are free to modify this function's signature, as long as the constructor builds a BVH
 void BVH::buildNumLeaves()
 {
+<<<<<<< HEAD
     int counter = 0;
     for (int i = 0; i < m_nodes.size(); i++) {
         if (m_nodes[i].isLeaf())
             counter++;
     }
     m_numLeaves = counter;
+=======
+    m_numLeaves = 0;
+    std::vector<Node> n;
+    n.push_back(nodes()[0]);
+    Node node;
+    while (n.size() > 0) {
+        node = n.back();
+        n.pop_back();
+        if (node.isLeaf()) {
+            m_numLeaves++;
+        }
+
+        else {
+            n.push_back(nodes()[node.rightChild()]);
+            n.push_back(nodes()[node.leftChild()]);
+        }
+    }
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
 }
 
 // Draw the bounding boxes of the nodes at the selected level. Use this function to visualize nodes
@@ -482,6 +657,7 @@ void BVH::debugDrawLevel(int level)
     // Example showing how to draw an AABB as a (white) wireframe box.
     // Hint: use draw functions (see `draw.h`) to draw the contained boxes with different
     // colors, transparencies, etc.
+<<<<<<< HEAD
     if (level < 0)
         return;
     uint32_t ulevel = static_cast<uint32_t>(level);
@@ -507,6 +683,27 @@ void BVH::debugDrawLevel(int level)
     }
     for (int i = 0; i < children.size(); i++) {
         drawAABB(children[i].aabb, DrawMode::Wireframe, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
+=======
+    std::vector<Node> n;
+    uint32_t l = 0;
+    n.push_back(nodes()[0]);
+    while (l < level) {
+        const uint32_t f = n.size();
+        for (int i = 0; i < f; i++) {
+            if (!n[0].isLeaf()) {
+                n.push_back(nodes()[n[0].leftChild()]);
+                n.push_back(nodes()[n[0].rightChild()]);
+            }
+
+            n.erase(n.begin());
+        }
+
+        l++;
+    }
+
+    for (const Node& node : n) {
+        drawAABB(node.aabb, DrawMode::Wireframe, glm::vec3(1, 1, 1), 1.0f);
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
     }
 }
 
@@ -520,6 +717,7 @@ void BVH::debugDrawLeaf(int leafIndex)
 {
     // Example showing how to draw an AABB as a (white) wireframe box.
     // Hint: use drawTriangle (see `draw.h`) to draw the contained primitives
+<<<<<<< HEAD
     if (leafIndex < 0)
         return;
     uint32_t uleafIndex = static_cast<uint32_t>(leafIndex);
@@ -532,6 +730,35 @@ void BVH::debugDrawLeaf(int leafIndex)
         if (counter - 1 == leafIndex) {
             drawAABB(m_nodes[i].aabb, DrawMode::Wireframe, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f);
             break;
+=======
+    // AxisAlignedBox aabb { .lower = glm::vec3(0.0f), .upper = glm::vec3(1.0f, 1.05f, 1.05f) };
+    // drawAABB(aabb, DrawMode::Wireframe, glm::vec3(0.05f, 1.0f, 0.05f), 0.1f);
+    if (leafIndex > 0) {
+        std::vector<Node> n;
+        std::vector<Node> leafs;
+        n.push_back(nodes()[0]);
+        Node node;
+        while (n.size() > 0) {
+            node = n.back();
+            n.pop_back();
+            if (node.isLeaf())
+                leafs.push_back(node);
+            else {
+                n.push_back(nodes()[node.rightChild()]);
+                n.push_back(nodes()[node.leftChild()]);
+            }
+        }
+
+        drawAABB(leafs[leafIndex - 1].aabb, DrawMode::Wireframe);
+        Primitive primitive;
+        std::array<Material, 4> m = { Material { .kd = glm::vec3(1, 0, 0) },
+            Material { .kd = glm::vec3(0, 1, 0) },
+            Material { .kd = glm::vec3(0, 0, 1) },
+            Material { .kd = glm::vec3(.3, .6, .9) } };
+        for (int i = 0; i < leafs[leafIndex - 1].primitiveCount(); i++) {
+            primitive = primitives()[leafs[leafIndex - 1].primitiveOffset() + i];
+            drawTriangle(primitive.v0, primitive.v1, primitive.v2, m[i]);
+>>>>>>> 912ad2a657d881b0d00f305fae449d0beb3e9fe8
         }
     }
 }
