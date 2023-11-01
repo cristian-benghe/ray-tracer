@@ -3,6 +3,7 @@
 #include "light.h"
 #include "recursive.h"
 #include "shading.h"
+#include "draw.h"
 #include <framework/trackball.h>
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance)
 {
@@ -176,6 +177,74 @@ glm::vec3 sampleEnvironmentMap(RenderState& state, Ray ray)
 size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::span<BVH::Primitive> primitives)
 {
     using Primitive = BVH::Primitive;
+    using Node = BVH::Node;
+    AxisAlignedBox aabb0;
+    AxisAlignedBox aabb1;
+    float lowest = std::numeric_limits<float>::max();
+    float surfaceArea;
+    size_t k = 0;
+    float x;
+    float y;
+    float z;
+    x = aabb.upper.x - aabb.lower.x;
+    y = aabb.upper.y - aabb.lower.y;
+    z = aabb.upper.z - aabb.lower.z;
+    float aabbArea = 2 * (x * y + x * z + y * z);
 
-    return 0; // This is clearly not the solution
+    std::vector<Primitive> p;
+    p.assign(primitives.begin(), primitives.end());
+    if (axis == 0)
+    std::sort(p.begin(), p.end(), [](Primitive p0, Primitive p1) {
+        return computePrimitiveCentroid(p0).x < computePrimitiveCentroid(p1).x;
+        });
+
+    else if (axis == 1)
+    std::sort(p.begin(), p.end(), [](Primitive p0, Primitive p1) {
+        return computePrimitiveCentroid(p0).y < computePrimitiveCentroid(p1).y;
+    });
+
+    else if (axis == 2)
+    std::sort(p.begin(), p.end(), [](Primitive p0, Primitive p1) {
+        return computePrimitiveCentroid(p0).z < computePrimitiveCentroid(p1).z;
+    });
+
+    for (int i = 1; i < glm::floor(p.size() / 1.0f); i += 1)
+    {
+        std::vector<Primitive> v0({ p.begin(), p.begin() + i });
+        std::vector<Primitive> v1({ p.begin() + i, p.end() });
+        aabb0 = computeSpanAABB(v0);
+        x = aabb0.upper.x - aabb0.lower.x;
+        y = aabb0.upper.y - aabb0.lower.y;
+        z = aabb0.upper.z - aabb0.lower.z;
+
+        
+        surfaceArea = 2 * (x * y + x * z + y * z) / aabbArea;
+        aabb1 = computeSpanAABB(v1);
+        x = aabb1.upper.x - aabb1.lower.x;
+        y = aabb1.upper.y - aabb1.lower.y;
+        z = aabb1.upper.z - aabb1.lower.z;
+        surfaceArea += (2 * x * y + 2 * x * z + 2 * y * z) / aabbArea;
+        if (surfaceArea < lowest)
+        {
+            lowest = surfaceArea;
+            k = i;
+        }
+    }
+
+    for (int i = 0; i < primitives.size(); i++)
+        primitives[i] = p[i];
+    
+    return k;
+}
+
+void debugSah(BVH bvh, int nodeIndex)
+{
+    using Node = BVHInterface::Node;
+    Node node = bvh.nodes()[nodeIndex];
+    if (!node.isLeaf())
+    {
+        drawAABB(node.aabb, DrawMode::Wireframe, {1, 0, 0});
+        drawAABB(bvh.nodes()[node.leftChild()].aabb, DrawMode::Wireframe, { 0, 1, 0 });
+        drawAABB(bvh.nodes()[node.rightChild()].aabb, DrawMode::Wireframe, { 0, 0, 1 });
+    }
 }

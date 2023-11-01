@@ -409,16 +409,19 @@ void BVH::buildRecursive(const Scene& scene, const Features& features, std::span
     if (primitives.size() <= LeafSize) {
         m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
     } else {
-        if (!features.extra.enableBvhSahBinning) {
-            size_t index = splitPrimitivesByMedian(aabb, computeAABBLongestAxis(aabb), primitives);
-            uint32_t i0 = nextNodeIdx();
-            uint32_t i1 = nextNodeIdx();
-            m_nodes[nodeIndex] = buildNodeData(scene, features, aabb, i0, i1);
-            std::span<Primitive> leftSubspan = primitives.subspan(0, index + 1);
-            std::span<Primitive> rightSubspan = primitives.subspan(index + 1);
-            buildRecursive(scene, features, leftSubspan, i0);
-            buildRecursive(scene, features, rightSubspan, i1);
-        }
+        size_t index;
+        if (features.extra.enableBvhSahBinning)
+            index = splitPrimitivesBySAHBin(aabb, computeAABBLongestAxis(aabb), primitives);
+        else
+            index = splitPrimitivesByMedian(aabb, computeAABBLongestAxis(aabb), primitives);
+
+        uint32_t i0 = nextNodeIdx();
+        uint32_t i1 = nextNodeIdx();
+        m_nodes[nodeIndex] = buildNodeData(scene, features, aabb, i0, i1);
+        std::span<Primitive> leftSubspan = primitives.subspan(0, index + 1);
+        std::span<Primitive> rightSubspan = primitives.subspan(index + 1);
+        buildRecursive(scene, features, leftSubspan, i0);
+        buildRecursive(scene, features, rightSubspan, i1);
     }
 }
 
