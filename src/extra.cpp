@@ -83,6 +83,87 @@ void renderImageWithMotionBlur(const Scene& scene, const BVHInterface& bvh, cons
 
 }
 
+Screen onlyBrightPixels(const Screen& image) 
+{
+    Screen onlyBright = image;
+    
+    int x = image.resolution().x;
+    int y = image.resolution().y;
+
+    for (int i = 0; i < x; i++) {
+        for (int j = 0; i < y; i++) {
+
+            glm::vec3 currentPixel = image.pixels()[image.indexAt(i, j)];
+
+            // convert to grayscale and comapre with brightness threshold
+            if (currentPixel.x * 0.299 + currentPixel.y * 0.587 + currentPixel.z * 0.114 <= 0.6) {
+                onlyBright.setPixel(i, j, glm::vec3(0.0f));
+            }
+        }
+    }
+
+    return onlyBright;
+}
+
+int factorial(int n) 
+{
+    if (n == 1 || n == 0) return 1;
+    else return n * factorial(n - 1);
+}
+
+std::vector<float> calculateGaussianKernel(int size)
+{
+    std::vector<float> kernel;
+    float coefficientSum = 0.0f;
+    int nFactorial = factorial(size);
+
+    for (int i = 0; i <= size; i++) {
+        
+        int nkFactorial = factorial(size - i);
+        int kFactorial = factorial(i);
+
+        float coefficient = nFactorial / (kFactorial * nkFactorial);
+
+        coefficientSum += coefficient;
+        kernel.push_back(coefficient);
+    }
+
+    for (int i = 0; i <= size; i++) {
+        kernel[i] /= coefficientSum;
+    }
+
+    return kernel;
+}
+
+void applyGaussianFilter(Screen& image, std::vector<float> kernel, bool isHorizontal) {
+
+    int x = image.resolution().x;
+    int y = image.resolution().y;
+
+    int halfExtent = static_cast<int>(std::floor(kernel.size() / 2));
+
+    for (int i = 0; i < x; i++) {
+        for (int j = 0; j < y; j++) {
+
+            glm::vec3 newColor = glm::vec3(0);
+
+            for (int k = 0; k < kernel.size(); k++) {
+
+                int coordI = i;
+                int coordJ = j;
+                if (isHorizontal) coordI = i - halfExtent + k;
+                else coordJ = j - halfExtent + k;
+
+                if (coordI >= 0 && coordI < x && coordJ >= 0 && coordJ < y) {
+                    newColor += image.pixels()[image.indexAt(coordI, coordJ)] * kernel[k];
+                }
+            }
+            
+            image.setPixel(i, j, newColor);
+        }
+    }
+}
+
 // TODO; Extra feature
 // Given a rendered image, compute and apply a bloom post-processing effect to increase bright areas.
 // This method is not unit-tested, but we do expect to find it **exactly here**, and we'd rather
@@ -92,8 +173,10 @@ void postprocessImageWithBloom(const Scene& scene, const Features& features, con
     if (!features.extra.enableBloomEffect) {
         return;
     }
-
-    // ...
+    image = onlyBrightPixels(image);
+    std::vector<float> kernel = calculateGaussianKernel(16);
+    applyGaussianFilter(image, kernel, true);
+    applyGaussianFilter(image, kernel, false);
 }
 
 // TODO; Extra feature
