@@ -28,31 +28,6 @@ glm::vec3 sampleTextureNearest(const Image& image, const glm::vec2& texCoord)
     return image.pixels[index];
 }
 
-glm::vec2 calculateBoundary(const float p, const int maxBoundary)
-{
-    float lowerBound = 0.0f;
-    float upperBound = 0.0f;
-    if (std::abs(p - std::floor(p)) > std::abs(p - std::ceil(p))) {
-        lowerBound = std::floor(p) + 0.5;
-        upperBound = std::ceil(p) + 0.5;
-    } else if (std::abs(p - std::ceil(p)) > std::abs(p - std::floor(p))) {
-        lowerBound = std::floor(p) - 0.5;
-        upperBound = std::ceil(p) - 0.5;
-    }
-
-    glm::vec2 bothBoundaries = glm::vec2 { lowerBound, upperBound };
-    //glm::vec2 bothBoundariesSafe = glm::clamp(bothBoundaries, glm::vec2(0.0f), glm::vec2(maxBoundary) - glm::vec2(std::numeric_limits<float>::epsilon()));
-
-    return bothBoundaries;
-}
-
-glm::vec4 boundaryPoints(const float i, const float j, const int imageWidth, const int imageHeight)
-{
-    glm::vec2 iAxis = calculateBoundary(i, imageWidth);
-    glm::vec2 jAxis = calculateBoundary(j, imageHeight);
-    return glm::vec4 { iAxis.x, iAxis.y, jAxis.x, jAxis.y };
-}
-
 // TODO: Standard feature
 // Given an image, and relevant texture coordinates, sample the texture s.t.
 // a bilinearly interpolated texel is acquired from the image.
@@ -75,31 +50,55 @@ glm::vec3 sampleTextureBilinear(const Image& image, const glm::vec2& texCoord)
     float i = image.width * texCoordSafe.x;
     float j = image.height * (1.0f - texCoordSafe.y);
 
-    glm::vec4 c = boundaryPoints(i, j, image.width, image.height);
-    // lower x boundary     - c.x
-    // higher x boundary    - c.y
-    // lower y boundary     - c.z
-    // higher y boundary    - c.w
-    // lower, lower is (0, 0) -> upper left corner
+    float shiftI = i - std::floor(i);
+    float shiftJ = j - std::floor(j);
+    
+    float gradientI;
+    float gradientJ;
+    
+    if (shiftI > 0.5f)
+        gradientI = shiftI - 0.5f;
+    else 
+        gradientI = shiftI + 0.5f;
+    
+    if (shiftJ > 0.5f) 
+        gradientJ = shiftJ - 0.5f;
+    else 
+        gradientJ = shiftJ + 0.5f;
 
-    float alpha = i - c.x;
-    float beta = c.w - j;
+    int centralI = 0;
+    int centralJ = 0;
+    if (shiftI <= 0.5f && shiftJ <= 0.5f) {
+        centralI = std::floor(i);
+        centralJ = std::floor(j);
+    }
+    if (shiftI > 0.5f && shiftJ < 0.5f) {
+        centralI = std::floor(i) + 1;
+        centralJ = std::floor(j);
+    }
+    if (shiftI < 0.5f && shiftJ > 0.5f) {
+        centralI = std::floor(i);
+        centralJ = std::floor(j) + 1;
+    }
+    if (shiftI > 0.5f && shiftJ > 0.5f) {
+        centralI = std::floor(i) + 1;
+        centralJ = std::floor(j) + 1;
+    }
 
-    // int index = j * image.width + i;
-    int indexBL = static_cast<int>(std::floor(c.w)) * image.width + static_cast<int>(std::floor(c.x));
-    glm::vec3 bottomLeft = image.pixels[indexBL];
-    int indexBR = static_cast<int>(std::floor(c.w)) * image.width + static_cast<int>(std::floor(c.y));
-    glm::vec3 bottomRight = image.pixels[indexBR];
-    int indexUL = static_cast<int>(std::floor(c.z)) * image.width + static_cast<int>(std::floor(c.x));
-    glm::vec3 upperLeft = image.pixels[indexUL];
-    int indexUR = static_cast<int>(std::floor(c.z)) * image.width + static_cast<int>(std::floor(c.y));
-    glm::vec3 upperRight = image.pixels[indexUR];
+    glm::vec2 upperLeft = { glm::clamp(centralI - 1, 0, image.width - 1), glm::clamp(centralJ - 1, 0, image.height - 1) };
+    glm::vec2 upperRight = { glm::clamp(centralI, 0, image.width - 1), glm::clamp(centralJ - 1, 0, image.height - 1) };
+    glm::vec2 lowerLeft = { glm::clamp(centralI - 1, 0, image.width - 1), glm::clamp(centralJ, 0, image.height - 1) };
+    glm::vec2 lowerRight = { glm::clamp(centralI, 0, image.width - 1), glm::clamp(centralJ, 0, image.height - 1) };
 
-    glm::vec3 finalColor = 
-        (1 - alpha) * (1 - beta) * bottomLeft + 
-        alpha * (1 - beta) * bottomRight + 
-        (1 - alpha) * beta * upperLeft + 
-        alpha * beta * upperRight;
+    glm::vec3 colorUL = image.pixels[upperLeft.y * image.width + upperLeft.x];
+    glm::vec3 colorUR = image.pixels[upperRight.y * image.width + upperRight.x];
+    glm::vec3 colorLL = image.pixels[lowerLeft.y * image.width + lowerLeft.x];
+    glm::vec3 colorLR = image.pixels[lowerRight.y * image.width + lowerRight.x];
 
-    return finalColor;
+    glm::vec3 interpolated = glm::mix(
+        glm::mix(colorUL, colorUR, gradientI),
+        glm::mix(colorLL, colorLR, gradientI),
+        gradientJ );
+    
+    return interpolated;
 }
