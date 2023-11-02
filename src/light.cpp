@@ -104,25 +104,27 @@ glm::vec3 visibilityOfLightSampleTransparency(RenderState& state, const glm::vec
     // TODO: implement this function; currently, the light simply passes through
     HitInfo whereHit;
     glm::vec3 visibleLightColor = lightColor;
-    glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t - 10 * FLT_EPSILON);
-    Ray r = Ray(pointOfIntersection,lightPosition - pointOfIntersection,std::numeric_limits<float>::max());
-    float d;
+    glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t - 100 * FLT_EPSILON);
+    Ray r = Ray(pointOfIntersection,glm::normalize(lightPosition - pointOfIntersection),std::numeric_limits<float>::max());
+    float d = glm::length(lightPosition - pointOfIntersection);
     do 
     {
-        d = glm::length(lightPosition - pointOfIntersection);
+       
         
         state.bvh.intersect(state, r, whereHit);
-        drawRay(r,glm::vec3(0.0f));   
-        if (whereHit.material.transparency == 1.0f)
+        if (r.t - 100 * FLT_EPSILON > d)
             return visibleLightColor;
-        if(r.t < d) 
-            visibleLightColor = visibleLightColor * whereHit.material.kd * (1.0f - whereHit.material.transparency);
+        if (whereHit.material.transparency == 1.0f)
+            return glm::vec3(0.0f);
         
-
-        glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t + 10 * FLT_EPSILON);
+        //if (r.t - 100 * FLT_EPSILON < d) 
+        visibleLightColor = visibleLightColor * whereHit.material.kd * (1.0f - whereHit.material.transparency); 
+        
+        glm::vec3 pointOfIntersection = r.origin + r.direction * (r.t + 100 * FLT_EPSILON);
+        d = glm::length(lightPosition - pointOfIntersection);
         r = Ray(pointOfIntersection, glm::normalize(lightPosition - pointOfIntersection), std::numeric_limits<float>::max());
        
-    } while (r.t < d);
+    } while (true);
 
     return visibleLightColor;
 }

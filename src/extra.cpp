@@ -40,9 +40,9 @@ void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, co
     glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
     glm::vec3 dir = camera.generateRay(position).direction;
     glm::vec3 focalPoint = camera.position() + depth * dir; //point that is in focus
-    glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
+    //glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
     float focalDistance = glm::length(focalPoint - camera.position());
-    glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
+    //glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
 
 #ifdef NDEBUG // Enable multi threading in Release mode
 #pragma omp parallel for schedule(guided)
