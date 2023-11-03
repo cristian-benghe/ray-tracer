@@ -22,7 +22,7 @@ glm::vec3 computeBarycentricCoord(const glm::vec3& v0, const glm::vec3& v1, cons
     float A = triangleArea(v0, v1, v2);
     float alpha = triangleArea(p, v1, v2) / A;
     float beta = triangleArea(p, v0, v2) / A;
-    float gamma = 1 - alpha - beta;            // triangleArea(p, v0, v1) / A;
+    float gamma = 1 - alpha - beta; // triangleArea(p, v0, v1) / A;
     return glm::vec3(alpha, beta, gamma);
 }
 
