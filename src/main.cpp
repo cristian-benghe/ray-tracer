@@ -122,7 +122,8 @@ int main(int argc, char** argv)
 
                     glm::vec2 position = (glm::vec2(pixel.x, pixel.y) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
 
-                    debugRays = sampledRaysDebug(camera, camera.generateRay(position).direction, 25, 0.1f, config.features.extra.depth);
+                    debugRays = sampledRaysDebug(camera, camera.generateRay(position).direction, config.features.extra.numRays, 
+                        config.features.extra.aperture, config.features.extra.depth);
                 } break;
 
                 case GLFW_KEY_Y: {
@@ -243,6 +244,8 @@ int main(int argc, char** argv)
                     float minDepth = 0.1f;
                     float maxDepth = 30.0f;
                     ImGui::SliderFloat("Depth Range", &config.features.extra.depth, minDepth, maxDepth, "%.3f", 1.0f);
+                    ImGui::SliderFloat("Aperture Range", &config.features.extra.aperture, 0.0f, 1.0f, "%.3f");
+                    ImGui::SliderInt("Number of Rays Range", &config.features.extra.numRays, 2, 70);
 
                     ImGui::Unindent();
                 }
