@@ -30,7 +30,7 @@ add_library(FinalProjectLib
 	"src/render.cpp"
 	"src/extra.cpp"
 	"src/verification.cpp"
-)
+ )
 
 target_include_directories(FinalProjectLib PUBLIC "src")
 target_link_libraries(FinalProjectLib PUBLIC CGFramework OpenGL::GLU OpenMP::OpenMP_CXX)
@@ -57,7 +57,7 @@ endif()
 target_compile_definitions(FinalProjectLib PUBLIC
 	"-DDATA_DIR=\"${CMAKE_CURRENT_LIST_DIR}/data/\"")
 
-add_executable(FinalProject	"src/main.cpp")
+add_executable(FinalProject	"src/main.cpp" )
 target_link_libraries(FinalProject PUBLIC FinalProjectLib)
 target_compile_features(FinalProject PUBLIC cxx_std_20)
 enable_sanitizers(FinalProject)

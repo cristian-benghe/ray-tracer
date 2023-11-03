@@ -71,15 +71,19 @@ bool visibilityOfLightSampleBinary(RenderState& state, const glm::vec3& lightPos
         return true;
     } else {
         // Shadows are enabled in the renderer
-        // TODO: implement this function; currently, the light simply passes through
-        HitInfo whereHit;
-        glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t - 10 * FLT_EPSILON);
 
-        Ray r = Ray(pointOfIntersection, lightPosition - pointOfIntersection, std::numeric_limits<float>::max());
-        state.bvh.intersect(state, r, whereHit);
+        if (glm::length(lightColor) == 0)
+            return false;
+
+        HitInfo whereHit;
+        glm::vec3 pointOfIntersection = ray.origin + ray.direction * (ray.t - 0.001f);
+
+        Ray r = Ray(pointOfIntersection, glm::normalize(lightPosition - pointOfIntersection), std::numeric_limits<float>::max());
+        
         //glm::vec3 EPS = (FLT_EPSILON, FLT_EPSILON, FLT_EPSILON)
-           
-        return r.t + 2 * FLT_EPSILON >= 1.0f;
+        state.bvh.intersect(state, r, whereHit);
+
+        return r.t + 0.001f >= 1.0f * glm::length(lightPosition - pointOfIntersection);
     }
     
 }
@@ -109,8 +113,6 @@ glm::vec3 visibilityOfLightSampleTransparency(RenderState& state, const glm::vec
     float d = glm::length(lightPosition - pointOfIntersection);
     do 
     {
-       
-        
         state.bvh.intersect(state, r, whereHit);
         if (r.t - 100 * FLT_EPSILON > d)
             return visibleLightColor;

@@ -12,6 +12,14 @@
 #include <framework/opengl_includes.h>
 #include <iostream>
 
+bool isInsideAABB(const AxisAlignedBox& aabb, const glm::vec3& origin)
+{
+    // Origin's coordinates should be less than or equal and larger or equal to the AABB's upper and lower coordinates, respectively.
+    if (glm::all(glm::lessThanEqual(origin, aabb.upper)) && glm::all(glm::greaterThanEqual(origin, aabb.lower)))
+        return true;
+    return false;
+}
+
 // Helper method to fill in hitInfo object. This can be safely ignored (or extended).
 // Note: many of the functions in this helper tie in to standard/extra features you will have
 // to implement separately, see interpolate.h/.cpp for these parts of the project
@@ -47,11 +55,9 @@ void updateHitInfo(RenderState& state, const BVHInterface::Primitive& primitive,
 // NOTE: this constructor is tested, so do not change the function signature.
 BVH::BVH(const Scene& scene, const Features& features)
 {
-#ifndef NDEBUG
     // Store start of bvh build for timing
     using clock = std::chrono::high_resolution_clock;
     const auto start = clock::now();
-#endif
 
     // Count the total nr. of triangles in the scene
     size_t numTriangles = 0;
@@ -85,11 +91,18 @@ BVH::BVH(const Scene& scene, const Features& features)
     buildNumLevels();
     buildNumLeaves();
 
-#ifndef NDEBUG
     // Output end of bvh build for timing
     const auto end = clock::now();
     std::cout << "BVH construction time: " << std::chrono::duration<double, std::milli>(end - start).count() << "ms" << std::endl;
-#endif
+
+    // Output amount of triangles in scene
+  /*  size_t amount = 0;
+    for (Mesh mesh : scene.meshes)
+    {
+        amount += mesh.triangles.size();
+    }
+
+    printf("%zu\n", amount);*/
 }
 
 // BVH helper method; allocates a new node and returns its index
@@ -108,7 +121,7 @@ uint32_t BVH::nextNodeIdx()
 // This method is unit-tested, so do not change the function signature.
 AxisAlignedBox computePrimitiveAABB(const BVHInterface::Primitive primitive)
 {
-
+    // The lower coordinates are the minimum of all vertices' coordinates, while the maximum are taken for the upper coordinates.
     glm::vec3 v0 = primitive.v0.position;
     glm::vec3 v1 = primitive.v1.position;
     glm::vec3 v2 = primitive.v2.position;
@@ -134,9 +147,13 @@ AxisAlignedBox computePrimitiveAABB(const BVHInterface::Primitive primitive)
 // This method is unit-tested, so do not change the function signature.
 AxisAlignedBox computeSpanAABB(std::span<const BVHInterface::Primitive> primitives)
 {
+    // Start with the extreme ends for the AABB coordinates to allow proper maximum and minimum operations.
     glm::vec3 lowest(std::numeric_limits<float>::max());
     glm::vec3 highest(std::numeric_limits<float>::lowest());
 
+
+    // The lower coordinates are the minimum of the primitives's AABB lower coordinates.
+    // The upper coordinates take the maximum of primitives's AABB upper coordinates.
     for (const BVH::Primitive& primitive : primitives) {
         lowest = glm::min(lowest, computePrimitiveAABB(primitive).lower);
         highest = glm::max(highest, computePrimitiveAABB(primitive).upper);
@@ -152,6 +169,7 @@ AxisAlignedBox computeSpanAABB(std::span<const BVHInterface::Primitive> primitiv
 // This method is unit-tested, so do not change the function signature.
 glm::vec3 computePrimitiveCentroid(const BVHInterface::Primitive primitive)
 {
+    // Formula for computing the centroid coordinates of a triangle.
     glm::vec3 v0 = primitive.v0.position;
     glm::vec3 v1 = primitive.v1.position;
     glm::vec3 v2 = primitive.v2.position;
@@ -166,6 +184,7 @@ glm::vec3 computePrimitiveCentroid(const BVHInterface::Primitive primitive)
 // This method is unit-tested, so do not change the function signature.
 uint32_t computeAABBLongestAxis(const AxisAlignedBox& aabb)
 {
+    // Longest axis is the largest difference of corresponding upper and lower coordinates of the AABB.
     glm::vec3 diff = aabb.upper - aabb.lower;
     if (diff.x >= diff.y) {
         if (diff.x >= diff.z) {
@@ -196,6 +215,7 @@ size_t splitPrimitivesByMedian(const AxisAlignedBox& aabb, uint32_t axis, std::s
 {
     using Primitive = BVHInterface::Primitive;
 
+    // Sort the primitives by their centroid coordinate based on the axis.
     std::vector<Primitive> centroids;
     centroids.assign(primitives.begin(), primitives.end());
     if (axis == 0)
@@ -215,7 +235,8 @@ size_t splitPrimitivesByMedian(const AxisAlignedBox& aabb, uint32_t axis, std::s
         primitives[i] = centroids[i];
     }
 
-    return std::round(centroids.size() / 2.0f) - 1;
+    // By taking the ceiling of the size divided by 2 we always get the index of the first element of the second subrange.
+    return std::ceil(centroids.size() / 2.0f);
 }
 
 // TODO: Standard feature
@@ -263,16 +284,25 @@ bool intersectRayWithBVH(RenderState& state, const BVHInterface& bvh, Ray& ray, 
         //
         // Note that it is entirely possible for a ray to hit a leaf node, but not its primitives,
         // and it is likewise possible for a ray to hit both children of a node.
+
+        // Reserve space in stack to save performance.
         std::vector<BVHInterface::Node> tNodes;
         tNodes.reserve(256);
         BVHInterface::Node node = nodes[0];
         BVHInterface::Primitive p;
         tNodes.push_back(node);
         float t;
+
+        // Go through every left child of a node, when a leaf is hit or the ray doesn't go inside the node,
+        // check the last seen right child (on top of the stack).
         while (!tNodes.empty()) {
             t = ray.t;
-            if (intersectRayWithShape(node.aabb, ray)) {
+            
+            // If ray starts inside the AABB or intersects it, then the node is hit.
+            if (intersectRayWithShape(node.aabb, ray) || isInsideAABB(node.aabb, ray.origin)) {
                 ray.t = t;
+                
+                // Update ray.t only if the triangles in a leaf are closer than where the ray is pointing at now.
                 if (node.isLeaf()) {
                     for (int j = 0; j < node.primitiveCount(); j++) {
                         p = primitives[node.primitiveOffset() + j];
@@ -330,6 +360,7 @@ BVH::Node BVH::buildLeafData(const Scene& scene, const Features& features, const
     Node node;
     // TODO fill in the leaf's data; refer to `bvh_interface.h` for details
 
+    // Fill in AABB, amount of primitives and where the primitives are located in m_primitives.
     node.aabb = aabb;
     uint32_t data0 = 1u << 31;
     data0 += m_primitives.size();
@@ -355,6 +386,7 @@ BVH::Node BVH::buildNodeData(const Scene& scene, const Features& features, const
     Node node;
     // TODO fill in the node's data; refer to `bvh_interface.h` for details
 
+    // Fill in AABB and where both children are located.
     node.aabb = aabb;
     node.data = { leftChildIndex, rightChildIndex };
 
@@ -405,20 +437,29 @@ void BVH::buildRecursive(const Scene& scene, const Features& features, std::span
     // m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
 
     AxisAlignedBox aabb = computeSpanAABB(primitives);
-
+    // If primitives fit in a leaf, then build it.
     if (primitives.size() <= LeafSize) {
         m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
     } else {
-        if (!features.extra.enableBvhSahBinning) {
-            size_t index = splitPrimitivesByMedian(aabb, computeAABBLongestAxis(aabb), primitives);
-            uint32_t i0 = nextNodeIdx();
-            uint32_t i1 = nextNodeIdx();
-            m_nodes[nodeIndex] = buildNodeData(scene, features, aabb, i0, i1);
-            std::span<Primitive> leftSubspan = primitives.subspan(0, index + 1);
-            std::span<Primitive> rightSubspan = primitives.subspan(index + 1);
-            buildRecursive(scene, features, leftSubspan, i0);
-            buildRecursive(scene, features, rightSubspan, i1);
-        }
+        // Split nodes depending on which splitting feature is selected.
+        size_t index;
+        if (features.extra.enableBvhSahBinning)
+            index = splitPrimitivesBySAHBin(aabb, computeAABBLongestAxis(aabb), primitives);
+        else
+            index = splitPrimitivesByMedian(aabb, computeAABBLongestAxis(aabb), primitives);
+
+        // Reserve and get index for node's children.
+        uint32_t i0 = nextNodeIdx();
+        uint32_t i1 = nextNodeIdx();
+
+        // Build node and divide the primitives
+        m_nodes[nodeIndex] = buildNodeData(scene, features, aabb, i0, i1);
+        std::span<Primitive> leftSubspan = primitives.subspan(0, index);
+        std::span<Primitive> rightSubspan = primitives.subspan(index);
+
+        // Build children nodes.
+        buildRecursive(scene, features, leftSubspan, i0);
+        buildRecursive(scene, features, rightSubspan, i1);
     }
 }
 
@@ -427,6 +468,8 @@ void BVH::buildRecursive(const Scene& scene, const Features& features, std::span
 // You are free to modify this function's signature, as long as the constructor builds a BVH
 void BVH::buildNumLevels()
 {
+    // The leftmost pathway of the standard tree for the BVH is the longest one.
+    // By counting amount of nodes, we get number of levels.
     m_numLevels = 0;
     Node node = nodes()[0];
     while (!node.isLeaf()) {
@@ -441,6 +484,7 @@ void BVH::buildNumLevels()
 // You are free to modify this function's signature, as long as the constructor builds a BVH
 void BVH::buildNumLeaves()
 {
+    // Traverse nodes as described in intersectRayWithBVH and count the amount of leafs.
     m_numLeaves = 0;
     std::vector<Node> n;
     n.push_back(nodes()[0]);
@@ -468,6 +512,9 @@ void BVH::debugDrawLevel(int level)
     // Example showing how to draw an AABB as a (white) wireframe box.
     // Hint: use draw functions (see `draw.h`) to draw the contained boxes with different
     // colors, transparencies, etc.
+
+    // For every level smaller than the level we want to draw, get all nodes' children and ignore these nodes themselves.
+    // Draw the AABB's of the remaining nodes after this.
     std::vector<Node> n;
     uint32_t l = 0;
     n.push_back(nodes()[0]);
@@ -502,6 +549,8 @@ void BVH::debugDrawLeaf(int leafIndex)
     // Hint: use drawTriangle (see `draw.h`) to draw the contained primitives
     // AxisAlignedBox aabb { .lower = glm::vec3(0.0f), .upper = glm::vec3(1.0f, 1.05f, 1.05f) };
     // drawAABB(aabb, DrawMode::Wireframe, glm::vec3(0.05f, 1.0f, 0.05f), 0.1f);
+
+    // Traverse every node's children until only leafs are left. Draw then the AABB's and the triangles, in a fixed colorset, of every leaf.
     if (leafIndex > 0) {
         std::vector<Node> n;
         std::vector<Node> leafs;
@@ -528,5 +577,66 @@ void BVH::debugDrawLeaf(int leafIndex)
             primitive = primitives()[leafs[leafIndex - 1].primitiveOffset() + i];
             drawTriangle(primitive.v0, primitive.v1, primitive.v2, m[i]);
         }
+    }
+}
+
+
+// Traverse the BVH and test for intersections as described in intersectRayWithBVH.
+// Select a node.
+// Draw the AABB's of the selected node and its children if wished for with different colors.
+// Draw the intersection point of the ray hitting this node.
+// Draw the point at which the ray is pointing.
+void drawBVHIntersection(const BVHInterface& bvh, Ray& ray, int index, bool showParent, bool showLeftChild, bool showRightChild)
+{
+    ray.t = std::numeric_limits<float>::max();
+    std::vector<BVHInterface::Node> tNodes;
+    tNodes.reserve(256);
+    BVHInterface::Node node = bvh.nodes()[0];
+    BVHInterface::Primitive p;
+    HitInfo hitInfo;
+    tNodes.push_back(node);
+    float t;
+    int i = 0;
+    while (!tNodes.empty()) {
+        t = ray.t;
+        if (i == index)
+            drawSphere(ray.t * ray.direction + ray.origin, 0.01f, glm::vec3(0, 1, 0));
+        if (i == index && !node.isLeaf() && showParent)
+            drawAABB(node.aabb, DrawMode::Wireframe);
+        if (i == index && !node.isLeaf() && showLeftChild)
+            drawAABB(bvh.nodes()[node.leftChild()].aabb, DrawMode::Wireframe, {0, 1, 0});
+        if (i == index && !node.isLeaf() && showRightChild)
+            drawAABB(bvh.nodes()[node.rightChild()].aabb, DrawMode::Wireframe, {0, 0, 1});
+        if (i == index && node.isLeaf() && showParent)
+            drawAABB(node.aabb, DrawMode::Wireframe, glm::vec3(1, 0, 0));
+
+        if (intersectRayWithShape(node.aabb, ray) || isInsideAABB(node.aabb, ray.origin)) {
+            if (i == index && showParent)
+                drawSphere(ray.t * ray.direction + ray.origin, 0.01f, glm::vec3(1, 0, 0));
+            ray.t = t;
+            if (node.isLeaf()) {
+                for (int j = 0; j < node.primitiveCount(); j++) {
+                    p = bvh.primitives()[node.primitiveOffset() + j];
+                    drawTriangle(p.v0, p.v1, p.v2, { .kd = glm::vec3(1, 0, 0) });
+                    if (intersectRayWithTriangle(p.v0.position, p.v1.position, p.v2.position, ray, hitInfo)) {
+
+                    }
+                }
+
+                node = tNodes.back();
+                tNodes.pop_back();
+            }
+
+            else {
+                tNodes.push_back(bvh.nodes()[node.rightChild()]);
+                node = bvh.nodes()[node.leftChild()];
+            }
+
+        } else {
+            node = tNodes.back();
+            tNodes.pop_back();
+        }
+
+        i++;
     }
 }

@@ -55,4 +55,21 @@ glm::vec3 sampleEnvironmentMap(RenderState& state, Ray ray);
 // NOTE: this method is unit-tested, so do not change the function signature.
 size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::span<BVHInterface::Primitive> primitives);
 
+
+//Generates multiple rays to simulate depth of field, creating a focus effect in rendering.
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance);
+
+
+//Generates rays for debugging and visualization purposes, typically used to examine ray behavior.
+std::vector<Ray> sampledRaysDebug(const Trackball& camera, const glm::vec3& targetDirection, int numRays, float apertureSize, float focusDistance);
+
+//Draws a circular pattern for debugging glossy reflection effects, aiding in visualizing the interaction of rays with surfaces.
+std::vector<glm::vec3> drawSampleCircleGlossyDebug(Ray r, glm::vec3 hitPosition);
+
+void showSAHNode(const BVHInterface& bvh, int level);
+
+uint32_t countNodes(const BVHInterface& bvh);
+
+std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance);
+
+void test(Sampler& sampler, const BVHInterface& bvh, int nodeIndex);

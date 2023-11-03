@@ -3,8 +3,40 @@
 #include "light.h"
 #include "recursive.h"
 #include "shading.h"
+#include "draw.h"
 #include <framework/trackball.h>
 #include <texture.h>
+
+
+std::vector<Ray> sampledRaysDebug(const Trackball& camera, const glm::vec3& targetDirection, int numRays, float apertureSize, float focusDistance)
+{
+    std::vector<Ray> rayList;
+
+    //Uniform distribution sampler
+    std::random_device randomDevice;
+    std::mt19937 randomGen(randomDevice());
+    std::uniform_real_distribution<float> randomDistr(-1.0f, 1.0f);
+
+    //The following are the camera up and left vectors used to offset the origin
+    glm::vec3 cameraUp = camera.up(); 
+    glm::vec3 cameraLeft = camera.left();
+
+    for (int i = 0; i < numRays; ++i) {
+        // These ones will be used for the offset
+        float offset_x = 2.0f * randomDistr(randomGen) * apertureSize;
+        float offset_y = 2.0f * randomDistr(randomGen) * apertureSize;
+
+
+        //We compute the focal point
+        glm::vec3 focalPoint = glm::normalize(targetDirection) * focusDistance + camera.position();
+        glm::vec3 rayOrigin = camera.position() + offset_x * cameraLeft + offset_y * cameraUp;
+        // Construct a ray from the origin towards the focal point, normalizing the direction vector
+        rayList.push_back(Ray { rayOrigin, glm::normalize(focalPoint - rayOrigin), std::numeric_limits<float>::max() });
+    }
+    // Return the list of generated (perturbated) rays
+    return rayList;
+}
+
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance)
 {
     std::vector<Ray> rays;
@@ -13,14 +45,15 @@ std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, fl
     glm::vec3 cameraRight = -camera.left();
 
     for (int i = 0; i < numRays; ++i) {
+        // We generate random offsets within the square aperture
         float offset_x = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
         float offset_y = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
-
+        
         glm::vec3 dirr = glm::normalize(pixelDirection);
-
+        //the focal point
         glm::vec3 pointt = dirr * focusDistance + pixelOrigin;
 
-        glm::vec3 origin = pixelOrigin + offset_x * cameraRight + offset_y * cameraUp;
+        glm::vec3 origin = pixelOrigin + offset_x * cameraRight + offset_y * cameraUp; //the origin including the offset
         rays.push_back(Ray { origin, glm::normalize(pointt - origin), std::numeric_limits<float>::max() });
     }
     return rays;
@@ -34,14 +67,16 @@ std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, fl
 // not go on a hunting expedition for your implementation, so please keep it here!
 void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, const Features& features, const Trackball& camera, Screen& screen)
 {   
+    // Check if depth of field feature is enabled
     if (!features.extra.enableDepthOfField) {
         return;
     }
-    float depth = features.extra.depth; //focalDistance
+    float depth = features.extra.depth; //// Focal distance
     glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
     glm::vec3 dir = camera.generateRay(position).direction;
     glm::vec3 focalPoint = camera.position() + depth * dir; //point that is in focus
     //glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
+    //  Calculate focal distance (distance between camera and focal point)
     float focalDistance = glm::length(focalPoint - camera.position());
     //glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
 
@@ -60,10 +95,18 @@ void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, co
             };
             glm::vec2 position = (glm::vec2(x,y) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
              
-            auto rays = sampledRays(camera.generateRay(position).origin,
+            // Generate rays for depth of field by sampling multiple rays
+            auto rays = sampledRays(
+                camera.generateRay(position).origin,
                 camera.generateRay(position).direction,
-                0.10f, 8, camera, features.extra.depth);
-
+                features.extra.aperture, // Aperture size
+                features.extra.numRays, // Number of rays to sample
+                camera, // Camera settings
+                features.extra.depth // Depth of focus
+            );
+            
+            
+            // Render the rays and set the resulting color to the screen
             auto L = renderRays(state, rays);
             screen.setPixel(x, y, L);
         }
@@ -227,7 +270,7 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
 
     glm::vec3 u, v;
     glm::vec3 r = ray.direction;
-
+    // Calculate the vectors u and v they will span the circle
     u = glm::cross(glm::vec3(0, 1, 0), r);
     if (r == glm::vec3(0,1,0))
         u = glm::cross(glm::vec3(1, 0, 0), r);
@@ -240,9 +283,11 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
     glm::vec3 computedGlossyColor = glm::vec3(0);
 
     for (int i = 0; i < numSamples; ++i) {
+        // Generate random angles for r prime (the perturbated ray)
         float theta = (static_cast<float>(rand()) / RAND_MAX) * 2 * glm::pi<float>();
 
         float randomSmallerRadius = static_cast<double>(rand()) / RAND_MAX * radius;
+        // Calculate the direction of the perturbed ray
 
         glm::vec3 r_prime_direction = glm::normalize(reflectedRay.direction + hitInfo.material.shininess / 64.0f * 
             (u * (randomSmallerRadius * cos(theta)) + v * (randomSmallerRadius * sin(theta))));
@@ -251,10 +296,33 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
         perturbedRay.origin = reflectedRay.origin;
         perturbedRay.direction = r_prime_direction;
         perturbedRay.t = std::numeric_limits<float>::max();
+        // Recursively render the perturbed ray
         computedGlossyColor += renderRay(state, perturbedRay, rayDepth + 1);
     }
     
-    hitColor += computedGlossyColor / (float) numSamples * hitInfo.material.ks;
+    hitColor += computedGlossyColor / (float) numSamples * hitInfo.material.ks; // We update the hit color based on the computed glossy color
+
+}
+
+std::vector<glm::vec3> drawSampleCircleGlossyDebug(Ray r, glm::vec3 hitPosition) {
+    // Calculate the normal of the circle
+    glm::vec3 circleNormal = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), r.direction));
+
+    std::vector<glm::vec3> vertices;
+    // Loop to generate vertices for the circle (they will be used in GL_TRIANGLES_STRIP)
+    for (int i = 0; i < 100; ++i) {
+        float angle1 = static_cast<float>(i) / 100 * glm::two_pi<float>();
+        float angle2 = static_cast<float>(i + 1) / 100 * glm::two_pi<float>();
+        // Calculate vertex positions on the circle
+        glm::vec3 vertex1 = hitPosition + 0.05f * (glm::normalize(glm::cross(circleNormal, r.direction)) * cos(angle1) + circleNormal * sin(angle1));
+        glm::vec3 vertex2 = hitPosition + 0.05f * (glm::normalize(glm::cross(circleNormal, r.direction)) * cos(angle2) + circleNormal * sin(angle2));
+        glm::vec3 vertex3 = hitPosition;
+
+        vertices.push_back(vertex1);
+        vertices.push_back(vertex2);
+        vertices.push_back(vertex3);
+    }
+    return vertices; //the vertices to compute the circle
 }
 
 // TODO; Extra feature
@@ -326,6 +394,168 @@ glm::vec3 sampleEnvironmentMap(RenderState& state, Ray ray)
 size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::span<BVH::Primitive> primitives)
 {
     using Primitive = BVH::Primitive;
+    using Node = BVH::Node;
+    AxisAlignedBox aabb0;
+    AxisAlignedBox aabb1;
+    float lowest = std::numeric_limits<float>::max();
+    float surfaceArea;
+    size_t k = 0;
 
-    return 0; // This is clearly not the solution
+    // Calculate the surface area of the parent node.
+    float x = aabb.upper.x - aabb.lower.x;
+    float y = aabb.upper.y - aabb.lower.y;
+    float z = aabb.upper.z - aabb.lower.z;
+    float aabbArea = 2 * (x * y + x * z + y * z);
+
+    // Sort the primitives.
+    std::vector<Primitive> p;
+    p.assign(primitives.begin(), primitives.end());
+    if (axis == 0)
+    std::sort(p.begin(), p.end(), [](Primitive p0, Primitive p1) {
+        return computePrimitiveCentroid(p0).x < computePrimitiveCentroid(p1).x;
+        });
+
+    else if (axis == 1)
+    std::sort(p.begin(), p.end(), [](Primitive p0, Primitive p1) {
+        return computePrimitiveCentroid(p0).y < computePrimitiveCentroid(p1).y;
+    });
+
+    else if (axis == 2)
+    std::sort(p.begin(), p.end(), [](Primitive p0, Primitive p1) {
+        return computePrimitiveCentroid(p0).z < computePrimitiveCentroid(p1).z;
+    });
+
+    // Define the bins or interval of splitting planes.
+    const int size = std::ceil(primitives.size() / 8.0f);
+
+    // Repeat the following process for every bin.
+    for (int i = 1; i < p.size() - 1; i += size)
+    {
+        // Compute the probability of hitting A and B multiplied by the amount of primitives (cost of intersection of A and B's elements).
+        std::vector<Primitive> v0({ p.begin(), p.begin() + i });
+        std::vector<Primitive> v1({ p.begin() + i, p.end() });
+        aabb0 = computeSpanAABB(v0);
+        x = aabb0.upper.x - aabb0.lower.x;
+        y = aabb0.upper.y - aabb0.lower.y;
+        z = aabb0.upper.z - aabb0.lower.z;
+        surfaceArea = (x * y + x * z + y * z) * v0.size();
+
+        aabb1 = computeSpanAABB(v1);
+        x = aabb1.upper.x - aabb1.lower.x;
+        y = aabb1.upper.y - aabb1.lower.y;
+        z = aabb1.upper.z - aabb1.lower.z;
+        surfaceArea += (x * y + x * z + y * z) * v1.size();
+        surfaceArea *= 2;
+        surfaceArea /= aabbArea;
+
+        // If the cost is lower than what we have calculated before, replace this is as the current lowest cost with its corresponding splitting index.
+        if (surfaceArea < lowest)
+        {
+            lowest = surfaceArea;
+            k = i;
+        }
+    }
+
+    for (int i = 0; i < primitives.size(); i++)
+        primitives[i] = p[i];
+    
+    // Return the index of the first element in the second subrange (splitting index).
+    return k;
+}
+
+// Helper method to count amount of non-leaf nodes in the BVH (including the dummy node).
+uint32_t countNodes(const BVHInterface& bvh)
+{
+    // If root node is a leaf return 0.
+    uint32_t count = 0;
+    using Node = BVHInterface::Node;
+    Node node = bvh.nodes()[0];
+    if (node.isLeaf())
+        return 0;
+
+    // Go through every left child of a node, when a leaf is hit check the last seen right child (on top of the stack).
+    std::vector<Node> n;
+    while (true)
+    {
+        if (node.isLeaf())
+        {
+            if (n.empty())
+                break;
+
+            node = n.back();
+            n.pop_back();
+            
+        }
+
+        else
+        {
+            count++;
+            n.push_back(bvh.nodes()[node.rightChild()]);
+            node = bvh.nodes()[node.leftChild()];
+        }
+    }
+
+    return count;
+}
+
+// Return a vector with all the primitives under a given node.
+std::vector<BVHInterface::Primitive> findPrimitives(const BVHInterface& bvh, BVHInterface::Node node)
+{
+    using Node = BVHInterface::Node;
+    using Primitive = BVHInterface::Primitive;
+    std::vector<Primitive> primitives;
+    std::vector<Node> nodes;
+    nodes.push_back(node);
+
+    // Go through every left child and store the corresponding right child on the stack.
+    // When a leaf is hit, save the leaf in a separate vector, and traverse through the last saved right child (on top of the stack).
+    while (!nodes.empty())
+    {
+        if (node.isLeaf())
+        {
+            for (int i = 0; i < node.primitiveCount(); i++)
+            {
+                primitives.push_back(bvh.primitives()[node.primitiveOffset() + i]);
+            }
+
+            node = nodes.back();
+            nodes.pop_back();
+        }
+
+        else
+        {
+            nodes.push_back(bvh.nodes()[node.rightChild()]);
+            node = bvh.nodes()[node.leftChild()];
+        }
+    }
+
+    return primitives;
+}
+
+// Debug for SAH+Binning. Show for the selected node the AABB of itself and its children,
+// and show the triangles under those children by matching their colors to their node's AABB color.
+// Every triangle has a slightly different accent of their designated color by using a randomizer.
+void test(Sampler& sampler, const BVHInterface& bvh, int nodeIndex)
+{
+    if (nodeIndex >= 0)
+    {
+        using Node = BVHInterface::Node;
+        using Primitive = BVHInterface::Primitive;
+        Node node = bvh.nodes()[nodeIndex];
+        if (!node.isLeaf()) {
+            drawAABB(node.aabb, DrawMode::Wireframe, glm::vec3(1, 0, 0));
+            Node leftChild = bvh.nodes()[node.leftChild()];
+            drawAABB(leftChild.aabb, DrawMode::Wireframe, glm::vec3(0, 1, 0));
+            std::vector<Primitive> primitivesLeftChild = findPrimitives(bvh, leftChild);
+            for (const Primitive& primitive : primitivesLeftChild) {
+                drawTriangle(primitive.v0, primitive.v1, primitive.v2, { .kd = sampler.next_1d() * glm::vec3(0, 1, 0) });
+            }
+            Node rightChild = bvh.nodes()[node.rightChild()];
+            drawAABB(rightChild.aabb, DrawMode::Wireframe, glm::vec3(0, 0, 1));
+            std::vector<Primitive> primitivesRightChild = findPrimitives(bvh, rightChild);
+            for (const Primitive& primitive : primitivesRightChild) {
+                drawTriangle(primitive.v0, primitive.v1, primitive.v2, { .kd = sampler.next_1d() * glm::vec3(0, 0, 1) });
+            }
+        }
+    }
 }
