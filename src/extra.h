@@ -55,4 +55,8 @@ glm::vec3 sampleEnvironmentMap(RenderState& state, Ray ray);
 // NOTE: this method is unit-tested, so do not change the function signature.
 size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::span<BVHInterface::Primitive> primitives);
 
+void showSAHNode(const BVHInterface& bvh, int level);
+
+uint32_t countNodes(const BVHInterface& bvh);
+
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance);

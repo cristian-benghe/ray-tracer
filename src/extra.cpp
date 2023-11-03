@@ -208,7 +208,7 @@ size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::s
         return computePrimitiveCentroid(p0).z < computePrimitiveCentroid(p1).z;
     });
 
-    for (int i = 1; i < glm::floor(p.size() / 1.0f); i += 1)
+    for (int i = 1; i < p.size() - 1; i += 1)
     {
         std::vector<Primitive> v0({ p.begin(), p.begin() + i });
         std::vector<Primitive> v1({ p.begin() + i, p.end() });
@@ -237,14 +237,100 @@ size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::s
     return k;
 }
 
-void debugSah(BVH bvh, int nodeIndex)
+uint32_t countNodes(const BVHInterface& bvh)
+{
+    uint32_t count = 0;
+    using Node = BVHInterface::Node;
+    Node node = bvh.nodes()[0];
+    if (node.isLeaf())
+        return 1;
+
+    std::vector<Node> n;
+    while (true)
+    {
+        if (node.isLeaf())
+        {
+            if (n.empty())
+                break;
+
+            node = n.back();
+            n.pop_back();
+            
+        }
+
+        else
+        {
+            count++;
+            n.push_back(bvh.nodes()[node.rightChild()]);
+            node = bvh.nodes()[node.leftChild()];
+        }
+    }
+
+    return count;
+}
+
+void traverseBVH(const BVHInterface& bvh, BVHInterface::Node node, const Material material)
 {
     using Node = BVHInterface::Node;
-    Node node = bvh.nodes()[nodeIndex];
+    using Primitive = BVHInterface::Primitive;
+
+    std::vector<Node> nodes;
+
+    while (true) {
+        if (node.isLeaf()) {
+            for (int i = 0; i < node.primitiveCount(); i++) {
+                Primitive p = bvh.primitives()[node.primitiveOffset() + i];
+                drawTriangle(p.v0, p.v1, p.v2, material);
+            }
+
+            if (nodes.empty())
+                break;
+            node = nodes.back();
+            nodes.pop_back();
+        }
+
+        else {
+            nodes.push_back(bvh.nodes()[node.rightChild()]);
+            node = bvh.nodes()[node.leftChild()];
+        }
+    }
+}
+
+void showSAHNode(const BVHInterface& bvh, int nodeIndex)
+{
+    using Node = BVHInterface::Node;
+    using Primitive = BVHInterface::Primitive;
+
+    std::vector<Node> nodes;
+    nodes.push_back(bvh.nodes()[0]);
+    int i = 0;
+    while (nodes.size() < nodeIndex + 1)
+    {
+        Node node0 = bvh.nodes()[nodes[i].leftChild()];
+        Node node1 = bvh.nodes()[nodes[i].rightChild()];
+        if (!node0.isLeaf())
+        {
+            nodes.push_back(node0);
+        }
+
+        if (!node1.isLeaf()) {
+            nodes.push_back(node1);
+        }
+
+            i += 1;
+
+    }
+
+    Node node = nodes[nodeIndex];
+    Material green = { .kd = glm::vec3(0, 1, 0) };
+    Material blue = { .kd = glm::vec3(0, 0, 1) };
+
     if (!node.isLeaf())
     {
-        drawAABB(node.aabb, DrawMode::Wireframe, {1, 0, 0});
+        drawAABB(node.aabb, DrawMode::Wireframe, { 1, 0, 0 });
         drawAABB(bvh.nodes()[node.leftChild()].aabb, DrawMode::Wireframe, { 0, 1, 0 });
+        traverseBVH(bvh, bvh.nodes()[node.leftChild()], green);
         drawAABB(bvh.nodes()[node.rightChild()].aabb, DrawMode::Wireframe, { 0, 0, 1 });
+        traverseBVH(bvh, bvh.nodes()[node.rightChild()], blue);
     }
 }
