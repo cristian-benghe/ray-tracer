@@ -266,11 +266,14 @@ size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::s
     float lowest = std::numeric_limits<float>::max();
     float surfaceArea;
     size_t k = 0;
+
+    // Calculate the surface area of the parent node.
     float x = aabb.upper.x - aabb.lower.x;
     float y = aabb.upper.y - aabb.lower.y;
     float z = aabb.upper.z - aabb.lower.z;
     float aabbArea = 2 * (x * y + x * z + y * z);
 
+    // Sort the primitives.
     std::vector<Primitive> p;
     p.assign(primitives.begin(), primitives.end());
     if (axis == 0)
@@ -288,10 +291,13 @@ size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::s
         return computePrimitiveCentroid(p0).z < computePrimitiveCentroid(p1).z;
     });
 
-    const int size = std::ceil(primitives.size() / 64.0f);
+    // Define the bins or interval of splitting planes.
+    const int size = std::ceil(primitives.size() / 8.0f);
 
+    // Repeat the following process for every bin.
     for (int i = 1; i < p.size() - 1; i += size)
     {
+        // Compute the probability of hitting A and B multiplied by the amount of primitives (cost of intersection of A and B's elements).
         std::vector<Primitive> v0({ p.begin(), p.begin() + i });
         std::vector<Primitive> v1({ p.begin() + i, p.end() });
         aabb0 = computeSpanAABB(v0);
@@ -299,6 +305,7 @@ size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::s
         y = aabb0.upper.y - aabb0.lower.y;
         z = aabb0.upper.z - aabb0.lower.z;
         surfaceArea = (x * y + x * z + y * z) * v0.size();
+
         aabb1 = computeSpanAABB(v1);
         x = aabb1.upper.x - aabb1.lower.x;
         y = aabb1.upper.y - aabb1.lower.y;
@@ -306,27 +313,33 @@ size_t splitPrimitivesBySAHBin(const AxisAlignedBox& aabb, uint32_t axis, std::s
         surfaceArea += (x * y + x * z + y * z) * v1.size();
         surfaceArea *= 2;
         surfaceArea /= aabbArea;
+
+        // If the cost is lower than what we have calculated before, replace this is as the current lowest cost with its corresponding splitting index.
         if (surfaceArea < lowest)
         {
             lowest = surfaceArea;
-            k = i - 1;
+            k = i;
         }
     }
 
     for (int i = 0; i < primitives.size(); i++)
         primitives[i] = p[i];
     
+    // Return the index of the first element in the second subrange (splitting index).
     return k;
 }
 
+// Helper method to count amount of non-leaf nodes in the BVH (including the dummy node).
 uint32_t countNodes(const BVHInterface& bvh)
 {
+    // If root node is a leaf return 0.
     uint32_t count = 0;
     using Node = BVHInterface::Node;
     Node node = bvh.nodes()[0];
     if (node.isLeaf())
-        return 1;
+        return 0;
 
+    // Go through every left child of a node, when a leaf is hit check the last seen right child (on top of the stack).
     std::vector<Node> n;
     while (true)
     {
@@ -351,71 +364,7 @@ uint32_t countNodes(const BVHInterface& bvh)
     return count;
 }
 
-void traverseBVH(const BVHInterface& bvh, BVHInterface::Node node, const Material material)
-{
-    using Node = BVHInterface::Node;
-    using Primitive = BVHInterface::Primitive;
-
-    std::vector<Node> nodes;
-
-    while (true) {
-        if (node.isLeaf()) {
-            for (int i = 0; i < node.primitiveCount(); i++) {
-                Primitive p = bvh.primitives()[node.primitiveOffset() + i];
-                drawTriangle(p.v0, p.v1, p.v2, material);
-            }
-
-            if (nodes.empty())
-                break;
-            node = nodes.back();
-            nodes.pop_back();
-        }
-
-        else {
-            nodes.push_back(bvh.nodes()[node.rightChild()]);
-            node = bvh.nodes()[node.leftChild()];
-        }
-    }
-}
-
-void showSAHNode(const BVHInterface& bvh, int nodeIndex)
-{
-    using Node = BVHInterface::Node;
-    using Primitive = BVHInterface::Primitive;
-
-    std::vector<Node> nodes;
-    nodes.push_back(bvh.nodes()[0]);
-    int i = 0;
-    while (nodes.size() < nodeIndex + 1)
-    {
-        Node node0 = bvh.nodes()[nodes[i].leftChild()];
-        Node node1 = bvh.nodes()[nodes[i].rightChild()];
-        if (!node0.isLeaf())
-        {
-            nodes.push_back(node0);
-        }
-
-        if (!node1.isLeaf()) {
-            nodes.push_back(node1);
-        }
-
-            i += 1;
-    }
-
-    Node node = nodes[nodeIndex];
-    Material green = { .kd = glm::vec3(0, 1, 0) };
-    Material blue = { .kd = glm::vec3(0, 0, 1) };
-
-    if (!node.isLeaf())
-    {
-        drawAABB(node.aabb, DrawMode::Wireframe, { 1, 0, 0 });
-        drawAABB(bvh.nodes()[node.leftChild()].aabb, DrawMode::Wireframe, { 0, 1, 0 });
-        traverseBVH(bvh, bvh.nodes()[node.leftChild()], green);
-        drawAABB(bvh.nodes()[node.rightChild()].aabb, DrawMode::Wireframe, { 0, 0, 1 });
-        traverseBVH(bvh, bvh.nodes()[node.rightChild()], blue);
-    }
-}
-
+// Return a vector with all the primitives under a given node.
 std::vector<BVHInterface::Primitive> findPrimitives(const BVHInterface& bvh, BVHInterface::Node node)
 {
     using Node = BVHInterface::Node;
@@ -423,6 +372,9 @@ std::vector<BVHInterface::Primitive> findPrimitives(const BVHInterface& bvh, BVH
     std::vector<Primitive> primitives;
     std::vector<Node> nodes;
     nodes.push_back(node);
+
+    // Go through every left child and store the corresponding right child on the stack.
+    // When a leaf is hit, save the leaf in a separate vector, and traverse through the last saved right child (on top of the stack).
     while (!nodes.empty())
     {
         if (node.isLeaf())
@@ -446,27 +398,30 @@ std::vector<BVHInterface::Primitive> findPrimitives(const BVHInterface& bvh, BVH
     return primitives;
 }
 
+// Debug for SAH+Binning. Show for the selected node the AABB of itself and its children,
+// and show the triangles under those children by matching their colors to their node's AABB color.
+// Every triangle has a slightly different accent of their designated color by using a randomizer.
 void test(Sampler& sampler, const BVHInterface& bvh, int nodeIndex)
 {
-    using Node = BVHInterface::Node;
-    using Primitive = BVHInterface::Primitive;
-    Node node = bvh.nodes()[nodeIndex];
-    if (!node.isLeaf())
+    if (nodeIndex >= 0)
     {
-        drawAABB(node.aabb, DrawMode::Wireframe, glm::vec3(1, 0, 0));
-        Node leftChild = bvh.nodes()[node.leftChild()];
-        drawAABB(leftChild.aabb, DrawMode::Wireframe, glm::vec3(0, 1, 0));
-        std::vector<Primitive> primitivesLeftChild = findPrimitives(bvh, leftChild);
-        for (const Primitive &primitive : primitivesLeftChild)
-        {
-            drawTriangle(primitive.v0, primitive.v1, primitive.v2, {.kd = sampler.next_1d() * glm::vec3(0, 1, 0)});
-        }
-        Node rightChild = bvh.nodes()[node.rightChild()];
-        drawAABB(rightChild.aabb, DrawMode::Wireframe, glm::vec3(0, 0, 1));
-        std::vector<Primitive> primitivesRightChild = findPrimitives(bvh, rightChild);
-        for (const Primitive &primitive : primitivesRightChild)
-        {
-            drawTriangle(primitive.v0, primitive.v1, primitive.v2, { .kd = sampler.next_1d() * glm::vec3(0, 0, 1) });
+        using Node = BVHInterface::Node;
+        using Primitive = BVHInterface::Primitive;
+        Node node = bvh.nodes()[nodeIndex];
+        if (!node.isLeaf()) {
+            drawAABB(node.aabb, DrawMode::Wireframe, glm::vec3(1, 0, 0));
+            Node leftChild = bvh.nodes()[node.leftChild()];
+            drawAABB(leftChild.aabb, DrawMode::Wireframe, glm::vec3(0, 1, 0));
+            std::vector<Primitive> primitivesLeftChild = findPrimitives(bvh, leftChild);
+            for (const Primitive& primitive : primitivesLeftChild) {
+                drawTriangle(primitive.v0, primitive.v1, primitive.v2, { .kd = sampler.next_1d() * glm::vec3(0, 1, 0) });
+            }
+            Node rightChild = bvh.nodes()[node.rightChild()];
+            drawAABB(rightChild.aabb, DrawMode::Wireframe, glm::vec3(0, 0, 1));
+            std::vector<Primitive> primitivesRightChild = findPrimitives(bvh, rightChild);
+            for (const Primitive& primitive : primitivesRightChild) {
+                drawTriangle(primitive.v0, primitive.v1, primitive.v2, { .kd = sampler.next_1d() * glm::vec3(0, 0, 1) });
+            }
         }
     }
 }
