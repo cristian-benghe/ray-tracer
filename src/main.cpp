@@ -78,8 +78,15 @@ int main(int argc, char** argv)
 
         int bvhDebugLevel = 0;
         int bvhDebugLeaf = 0;
+        float sahNodeIndex = 0;
+        int bvhIntersectionIndex = 0;
         bool debugBVHLevel { false };
         bool debugBVHLeaf { false };
+        bool debugSAHLevel { false };
+        bool debugBVHIntersection { false };
+        bool showParent = false;
+        bool showLeftChild(false);
+        bool showRightChild(false);
         ViewMode viewMode { ViewMode::Rasterization };
 
         window.registerKeyCallback([&](int key, int /* scancode */, int action, int /* mods */) {
@@ -300,6 +307,16 @@ int main(int argc, char** argv)
                 ImGui::Checkbox("Draw BVH Leaf", &debugBVHLeaf);
                 if (debugBVHLeaf)
                     ImGui::SliderInt("BVH Leaf", &bvhDebugLeaf, 1, bvh.numLeaves());
+                ImGui::Checkbox("Draw SAH Box", &debugSAHLevel);
+                if (debugSAHLevel)
+                    //ImGui::SliderInt("Node Index", &sahNodeIndex, 0, countNodes(bvh) - 1);
+                    ImGui::DragFloat("Node Index", &sahNodeIndex, 1.0f, 0, countNodes(bvh) - 1);
+                ImGui::Checkbox("Test intersection", &debugBVHIntersection);
+                ImGui::Checkbox("Show Parent Node", &showParent);
+                ImGui::Checkbox("Show Left Child", &showLeftChild);
+                ImGui::Checkbox("Show Right Child", &showRightChild);
+                if (debugBVHIntersection)
+                    ImGui::SliderInt("BVH Intersection Time", &bvhIntersectionIndex, 0, 20);
             }
 
             ImGui::Spacing();
@@ -457,7 +474,7 @@ int main(int argc, char** argv)
 
                 drawLightsOpenGL(scene, camera, selectedLightIdx);
 
-                if (debugBVHLevel || debugBVHLeaf) {
+                if (debugBVHLevel || debugBVHLeaf || debugSAHLevel || debugBVHIntersection) {
                     glPushAttrib(GL_ALL_ATTRIB_BITS);
                     setOpenGLMatrices(camera);
                     glDisable(GL_LIGHTING);
@@ -472,6 +489,10 @@ int main(int argc, char** argv)
                         bvh.debugDrawLevel(bvhDebugLevel);
                     if (debugBVHLeaf)
                         bvh.debugDrawLeaf(bvhDebugLeaf);
+                    if (debugSAHLevel)
+                        showSAHNode(bvh, sahNodeIndex);
+                    if (debugBVHIntersection && !debugRays.empty())
+                        drawBVHIntersection(bvh, debugRays[0], bvhIntersectionIndex, showParent, showLeftChild, showRightChild);
                     enableDebugDraw = false;
                     glPopAttrib();
                 }

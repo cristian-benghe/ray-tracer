@@ -9,6 +9,8 @@
 // This method is unit-tested, so do not change the function signature.
 AxisAlignedBox computePrimitiveAABB(const BVHInterface::Primitive primitive);
 
+void drawBVHIntersection(const BVHInterface& bvh, Ray& ray, int index, bool showParent, bool showLeftChild, bool showRightChild);
+
 // TODO: Standard feature
 // Given a range of BVH triangles, compute an axis-aligned bounding box around the range.
 // For a description of the method's arguments, refer to 'bounding_volume_hierarchy.cpp'

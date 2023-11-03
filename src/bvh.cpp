@@ -12,6 +12,13 @@
 #include <framework/opengl_includes.h>
 #include <iostream>
 
+bool isInsideAABB(const AxisAlignedBox& aabb, const glm::vec3& origin)
+{
+    if (glm::all(glm::lessThanEqual(origin, aabb.upper)) && glm::all(glm::greaterThanEqual(origin, aabb.lower)))
+        return true;
+    return false;
+}
+
 // Helper method to fill in hitInfo object. This can be safely ignored (or extended).
 // Note: many of the functions in this helper tie in to standard/extra features you will have
 // to implement separately, see interpolate.h/.cpp for these parts of the project
@@ -218,6 +225,53 @@ size_t splitPrimitivesByMedian(const AxisAlignedBox& aabb, uint32_t axis, std::s
     return std::round(centroids.size() / 2.0f) - 1;
 }
 
+bool sd(const AxisAlignedBox& box, Ray& ray)
+{
+    float xmin = box.lower.x;
+    float xmax = box.upper.x;
+    float ymin = box.lower.y;
+    float ymax = box.upper.y;
+    float zmin = box.lower.z;
+    float zmax = box.upper.z;
+    if (xmin == xmax || ymin == ymax || zmin == zmax || glm::length(ray.direction) == 0)
+        return false;
+    float txmin = (xmin - ray.origin.x) / ray.direction.x;
+    float txmax = (xmax - ray.origin.x) / ray.direction.x;
+    float tymin = (ymin - ray.origin.y) / ray.direction.y;
+    float tymax = (ymax - ray.origin.y) / ray.direction.y;
+    float tzmin = (zmin - ray.origin.z) / ray.direction.z;
+    float tzmax = (zmax - ray.origin.z) / ray.direction.z;
+    float txin = std::min(txmin, txmax);
+    float txout = std::max(txmin, txmax);
+    float tyin = std::min(tymin, tymax);
+    float tyout = std::max(tymin, tymax);
+    float tzin = std::min(tzmin, tzmax);
+    float tzout = std::max(tzmin, tzmax);
+    float tin = std::max(txin, tyin);
+    tin = std::max(tin, tzin);
+    float tout = std::min(txout, tyout);
+    tout = std::min(tout, tzout);
+    if (tout <= tin || tout <= 0)
+        return false;
+
+    if (tin <= 0) {
+        if (tout < ray.t)
+            ray.t = tout;
+        else
+            return false;
+    }
+
+    else {
+        if (tin < ray.t)
+            ray.t = tin;
+        else
+            return false;
+    }
+
+    return true;
+}
+
+
 // TODO: Standard feature
 // Hierarchy traversal routine; called by the BVH's intersect(),
 // you must implement this method and implement it carefully!
@@ -271,12 +325,15 @@ bool intersectRayWithBVH(RenderState& state, const BVHInterface& bvh, Ray& ray, 
         float t;
         while (!tNodes.empty()) {
             t = ray.t;
-            if (intersectRayWithShape(node.aabb, ray)) {
+            //drawAABB(node.aabb, DrawMode::Wireframe);
+            if (intersectRayWithShape(node.aabb, ray) || isInsideAABB(node.aabb, ray.origin)) {
+                //drawSphere(ray.t * ray.direction + ray.origin, 0.01f, glm::vec3(1));
                 ray.t = t;
                 if (node.isLeaf()) {
                     for (int j = 0; j < node.primitiveCount(); j++) {
                         p = primitives[node.primitiveOffset() + j];
                         if (intersectRayWithTriangle(p.v0.position, p.v1.position, p.v2.position, ray, hitInfo)) {
+                            //drawTriangle(p.v0, p.v1, p.v2, { .kd = glm::vec3(1, 0, 0) });
                             updateHitInfo(state, p, ray, hitInfo);
                             is_hit = true;
                         }
@@ -409,16 +466,19 @@ void BVH::buildRecursive(const Scene& scene, const Features& features, std::span
     if (primitives.size() <= LeafSize) {
         m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
     } else {
-        if (!features.extra.enableBvhSahBinning) {
-            size_t index = splitPrimitivesByMedian(aabb, computeAABBLongestAxis(aabb), primitives);
-            uint32_t i0 = nextNodeIdx();
-            uint32_t i1 = nextNodeIdx();
-            m_nodes[nodeIndex] = buildNodeData(scene, features, aabb, i0, i1);
-            std::span<Primitive> leftSubspan = primitives.subspan(0, index + 1);
-            std::span<Primitive> rightSubspan = primitives.subspan(index + 1);
-            buildRecursive(scene, features, leftSubspan, i0);
-            buildRecursive(scene, features, rightSubspan, i1);
-        }
+        size_t index;
+        if (features.extra.enableBvhSahBinning)
+            index = splitPrimitivesBySAHBin(aabb, computeAABBLongestAxis(aabb), primitives);
+        else
+            index = splitPrimitivesByMedian(aabb, computeAABBLongestAxis(aabb), primitives);
+
+        uint32_t i0 = nextNodeIdx();
+        uint32_t i1 = nextNodeIdx();
+        m_nodes[nodeIndex] = buildNodeData(scene, features, aabb, i0, i1);
+        std::span<Primitive> leftSubspan = primitives.subspan(0, index + 1);
+        std::span<Primitive> rightSubspan = primitives.subspan(index + 1);
+        buildRecursive(scene, features, leftSubspan, i0);
+        buildRecursive(scene, features, rightSubspan, i1);
     }
 }
 
@@ -528,5 +588,61 @@ void BVH::debugDrawLeaf(int leafIndex)
             primitive = primitives()[leafs[leafIndex - 1].primitiveOffset() + i];
             drawTriangle(primitive.v0, primitive.v1, primitive.v2, m[i]);
         }
+    }
+}
+
+void drawBVHIntersection(const BVHInterface& bvh, Ray& ray, int index, bool showParent, bool showLeftChild, bool showRightChild)
+{
+    ray.t = std::numeric_limits<float>::max();
+    std::vector<BVHInterface::Node> tNodes;
+    tNodes.reserve(256);
+    BVHInterface::Node node = bvh.nodes()[0];
+    BVHInterface::Primitive p;
+    HitInfo hitInfo;
+    tNodes.push_back(node);
+    float t;
+    int i = 0;
+    while (!tNodes.empty()) {
+        ray.t += 0.1f;
+        t = ray.t;
+        if (i == index)
+            drawSphere(ray.t * ray.direction + ray.origin, 0.01f, glm::vec3(0, 1, 0));
+        if (i == index && !node.isLeaf() && showParent)
+            drawAABB(node.aabb, DrawMode::Wireframe);
+        if (i == index && !node.isLeaf() && showLeftChild)
+            drawAABB(bvh.nodes()[node.leftChild()].aabb, DrawMode::Wireframe, {0, 1, 0});
+        if (i == index && !node.isLeaf() && showRightChild)
+            drawAABB(bvh.nodes()[node.rightChild()].aabb, DrawMode::Wireframe, {0, 0, 1});
+        if (i == index && node.isLeaf() && showParent)
+            drawAABB(node.aabb, DrawMode::Wireframe, glm::vec3(1, 0, 0));
+
+        if (intersectRayWithShape(node.aabb, ray) || isInsideAABB(node.aabb, ray.origin)) {
+            if (i == index && showParent)
+                drawSphere(ray.t * ray.direction + ray.origin, 0.01f, glm::vec3(1, 0, 0));
+            ray.t = t;
+            if (node.isLeaf()) {
+                for (int j = 0; j < node.primitiveCount(); j++) {
+                    p = bvh.primitives()[node.primitiveOffset() + j];
+                    drawTriangle(p.v0, p.v1, p.v2, { .kd = glm::vec3(1, 0, 0) });
+                    if (intersectRayWithTriangle(p.v0.position, p.v1.position, p.v2.position, ray, hitInfo)) {
+
+                    }
+                }
+
+                node = tNodes.back();
+                tNodes.pop_back();
+            }
+
+            else {
+                tNodes.push_back(bvh.nodes()[node.rightChild()]);
+                node = bvh.nodes()[node.leftChild()];
+            }
+
+        } else {
+            node = tNodes.back();
+            tNodes.pop_back();
+        }
+
+        i++;
     }
 }

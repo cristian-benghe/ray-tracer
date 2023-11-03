@@ -60,3 +60,6 @@ std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, fl
 std::vector<Ray> sampledRaysDebug(const Trackball& camera, const glm::vec3& targetDirection, int numRays, float apertureSize, float focusDistance);
 
 std::vector<glm::vec3> drawSampleCircleGlossyDebug(Ray r, glm::vec3 hitPosition);
+void showSAHNode(const BVHInterface& bvh, int level);
+
+uint32_t countNodes(const BVHInterface& bvh);
