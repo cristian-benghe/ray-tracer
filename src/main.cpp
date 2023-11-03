@@ -49,6 +49,9 @@ bool sliderIntSquarePower(const char* label, int* v, int v_min, int v_max);
 
 int main(int argc, char** argv)
 {
+    bool glossyDebug = false;
+    HitInfo whereHitGlossy;
+    Ray rayGlossy;
     Config config = {};
     if (argc > 1) {
         config = readConfigFile(argv[1]);
@@ -90,6 +93,7 @@ int main(int argc, char** argv)
             if (action == GLFW_PRESS) {
                 switch (key) {
                 case GLFW_KEY_R: {
+                    glossyDebug = false;
                     // Shoot a ray. Produce a ray from camera to the far plane.
                     RenderState state = { .scene = scene, .features = config.features, .bvh = bvh, .sampler = { debugRaySeed } };
                     auto tmp = window.getNormalizedCursorPos();
@@ -97,33 +101,50 @@ int main(int argc, char** argv)
                     debugRays = generatePixelRays(state, camera, pixel, screen.resolution());
                 } break;
                 case GLFW_KEY_A: {
+                    glossyDebug = false;
+
                     debugBVHLeafId++;
                 } break;
                 case GLFW_KEY_S: {
+                    glossyDebug = false;
+
                     debugBVHLeafId = std::max(0, debugBVHLeafId - 1);
 
                 } break;
                 case GLFW_KEY_T: {
+                    glossyDebug = false;
+
+                    // Debug Key for Depth of Field
                     // Shoot a ray. Produce a ray from camera to the far plane.
                     RenderState state = { .scene = scene, .features = config.features, .bvh = bvh, .sampler = { debugRaySeed } };
                     auto tmp = window.getNormalizedCursorPos();
                     auto pixel = glm::ivec2(tmp * glm::vec2(screen.resolution()));
 
-                    //float depth = config.features.extra.depth; // focalDistance
-                    //glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
-                    //glm::vec3 dir = camera.generateRay(position).direction;
-                    //glm::vec3 focalPoint = camera.position() + depth * dir; // point that is in focus
-                    //glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
-                    //float focalDistance = glm::length(focalPoint - camera.position());
-                    //glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
-                        
                     glm::vec2 position = (glm::vec2(pixel.x, pixel.y) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
 
-                    debugRays = sampledRays(camera.generateRay(position).origin, 
-                        camera.generateRay(position).direction,
-                        0.1f, 15, camera, config.features.extra.depth);
+                    debugRays = sampledRaysDebug(camera, camera.generateRay(position).direction, 25, 0.1f, config.features.extra.depth);
+                } break;
+
+                case GLFW_KEY_Y: {
+                    // Debug Key for Glossy reflections
+                    // Shoot a ray. Produce a ray from camera to the far plane.
+                    RenderState state = { .scene = scene, .features = config.features, .bvh = bvh, .sampler = { debugRaySeed } };
+                    auto tmp = window.getNormalizedCursorPos();
+                    auto pixel = glm::ivec2(tmp * glm::vec2(screen.resolution()));
+
+                    glm::vec2 position = (glm::vec2(pixel.x, pixel.y) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
+
+                    rayGlossy = camera.generateRay(position);
+                    bvh.intersect(state, rayGlossy, whereHitGlossy);
+                  
+                    debugRays = {rayGlossy};
+
+                    glossyDebug = true;
+
                 } break;
                 case GLFW_KEY_ESCAPE: {
+                    glossyDebug = false;
+
                     window.close();
                 } break;
                 };
@@ -430,15 +451,20 @@ int main(int argc, char** argv)
                         //auto tmp = window.getNormalizedCursorPos();
                         //auto pixel = glm::ivec2(tmp * glm::vec2(screen.resolution()));
 
-                        float depth = config.features.extra.depth; // focalDistance
-                        glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
-                        glm::vec3 dir = camera.generateRay(position).direction;
-                        glm::vec3 focalPoint = camera.position() + depth * dir; // point that is in focus
-                        glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
-                        float focalDistance = glm::length(focalPoint - camera.position());
-                        glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
+                        if (glossyDebug == true) {
+                            glm::vec3 center = rayGlossy.origin + rayGlossy.t * rayGlossy.direction;
+                            //(rayGlossy.origin + rayGlossy.t * rayGlossy.direction, 0.01f, glm::vec3(0.5, 0.25,0));
 
-                        drawSphere(glm::vec3(0,0,0), 0.02f, glm::vec3(0.5, 0.5, 0));
+                            glBegin(GL_TRIANGLE_STRIP);
+                            std::vector<glm::vec3> v = drawSampleCircleGlossyDebug(generateReflectionRay(rayGlossy,whereHitGlossy),
+                                rayGlossy.origin + rayGlossy.t * rayGlossy.direction);
+                            
+                            glColor3f(0.5f, 0.25f, 0.0f);
+                            for (int i = 0; i < 300; ++i) {
+                                glVertex3f(v[i].x, v[i].y, v[i].z);
+                            }
+                            glEnd();
+                        }
 
 
                         enableDebugDraw = false;
