@@ -96,7 +96,7 @@ Screen onlyBrightPixels(const Screen& image)
             glm::vec3 currentPixel = image.pixels()[image.indexAt(i, j)];
 
             // convert to grayscale and comapre with brightness threshold
-            if (currentPixel.x * 0.299 + currentPixel.y * 0.587 + currentPixel.z * 0.114 <= 0.6) {
+            if (currentPixel.x * 0.299 + currentPixel.y * 0.587 + currentPixel.z * 0.114 <= 0.4) {
                 onlyBright.setPixel(i, j, glm::vec3(0.0f));
             }
         }
@@ -128,7 +128,7 @@ std::vector<float> calculateGaussianKernel(int size)
         kernel.push_back(coefficient);
     }
 
-    for (int i = 0; i <= size; i++) {
+    for (int i = 0; i < size; i++) {
         kernel[i] /= coefficientSum;
     }
 
@@ -149,17 +149,31 @@ void applyGaussianFilter(Screen& image, std::vector<float> kernel, bool isHorizo
 
             for (int k = 0; k < kernel.size(); k++) {
 
-                int coordI = i;
-                int coordJ = j;
-                if (isHorizontal) coordI = i - halfExtent + k;
-                else coordJ = j - halfExtent + k;
+                if (isHorizontal) {
+                    int coordI = i - halfExtent + k;
 
-                if (coordI >= 0 && coordI < x && coordJ >= 0 && coordJ < y) {
-                    newColor += image.pixels()[image.indexAt(coordI, coordJ)] * kernel[k];
+                    if (coordI >= 0 && coordI < x)
+                        newColor += image.pixels()[image.indexAt(coordI, j)] * kernel[k];
+                } else {
+                    int coordJ = j - halfExtent + k;
+
+                    if (coordJ >= 0 && coordJ < y)
+                        newColor += image.pixels()[image.indexAt(i, coordJ)] * kernel[k];
                 }
             }
             
             image.setPixel(i, j, newColor);
+        }
+    }
+}
+
+void applyBloom(Screen& normal, Screen& bright) {
+
+    for (int i = 0; i < normal.resolution().x; i++) {
+        for (int j = 0; j < normal.resolution().y; j++) {
+
+            int index = normal.indexAt(i, j);
+            normal.setPixel(i, j, normal.pixels()[index] + bright.pixels()[index]);
         }
     }
 }
@@ -173,10 +187,11 @@ void postprocessImageWithBloom(const Scene& scene, const Features& features, con
     if (!features.extra.enableBloomEffect) {
         return;
     }
-    image = onlyBrightPixels(image);
+    Screen brightPixels = onlyBrightPixels(image);
     std::vector<float> kernel = calculateGaussianKernel(16);
-    applyGaussianFilter(image, kernel, true);
-    applyGaussianFilter(image, kernel, false);
+    applyGaussianFilter(brightPixels, kernel, true);
+    applyGaussianFilter(brightPixels, kernel, false);
+    applyBloom(image, brightPixels);
 }
 
 // TODO; Extra feature
