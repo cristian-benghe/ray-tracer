@@ -54,11 +54,9 @@ void updateHitInfo(RenderState& state, const BVHInterface::Primitive& primitive,
 // NOTE: this constructor is tested, so do not change the function signature.
 BVH::BVH(const Scene& scene, const Features& features)
 {
-#ifndef NDEBUG
     // Store start of bvh build for timing
     using clock = std::chrono::high_resolution_clock;
     const auto start = clock::now();
-#endif
 
     // Count the total nr. of triangles in the scene
     size_t numTriangles = 0;
@@ -92,11 +90,10 @@ BVH::BVH(const Scene& scene, const Features& features)
     buildNumLevels();
     buildNumLeaves();
 
-#ifndef NDEBUG
     // Output end of bvh build for timing
     const auto end = clock::now();
     std::cout << "BVH construction time: " << std::chrono::duration<double, std::milli>(end - start).count() << "ms" << std::endl;
-#endif
+    printf("%u\n", m_primitives.size());
 }
 
 // BVH helper method; allocates a new node and returns its index
@@ -462,7 +459,6 @@ void BVH::buildRecursive(const Scene& scene, const Features& features, std::span
     // m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
 
     AxisAlignedBox aabb = computeSpanAABB(primitives);
-
     if (primitives.size() <= LeafSize) {
         m_nodes[nodeIndex] = buildLeafData(scene, features, aabb, primitives);
     } else {

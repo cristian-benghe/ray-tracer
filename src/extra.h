@@ -60,3 +60,5 @@ void showSAHNode(const BVHInterface& bvh, int level);
 uint32_t countNodes(const BVHInterface& bvh);
 
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance);
+
+void test(Sampler& sampler, const BVHInterface& bvh, int nodeIndex);
