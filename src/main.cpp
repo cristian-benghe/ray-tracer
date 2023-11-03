@@ -78,7 +78,7 @@ int main(int argc, char** argv)
 
         int bvhDebugLevel = 0;
         int bvhDebugLeaf = 0;
-        float sahNodeIndex = 0;
+        int sahNodeIndex = 0;
         int bvhIntersectionIndex = 0;
         bool debugBVHLevel { false };
         bool debugBVHLeaf { false };
@@ -312,8 +312,8 @@ int main(int argc, char** argv)
                     ImGui::SliderInt("BVH Leaf", &bvhDebugLeaf, 1, bvh.numLeaves());
                 ImGui::Checkbox("Draw SAH Box", &debugSAHLevel);
                 if (debugSAHLevel)
-                    //ImGui::SliderInt("Node Index", &sahNodeIndex, 0, countNodes(bvh) - 1);
-                    ImGui::DragFloat("Node Index", &sahNodeIndex, 1.0f, 0, countNodes(bvh) - 1);
+                    ImGui::SliderInt("Node Index", &sahNodeIndex, 0, countNodes(bvh) - 1);
+                    //ImGui::DragFloat("Node Index", &sahNodeIndex, 1.0f, 0, countNodes(bvh) - 1);
                 ImGui::Checkbox("Test intersection", &debugBVHIntersection);
                 ImGui::Checkbox("Show Parent Node", &showParent);
                 ImGui::Checkbox("Show Left Child", &showLeftChild);
@@ -431,7 +431,7 @@ int main(int argc, char** argv)
             switch (viewMode) {
             case ViewMode::Rasterization: {
                 glPushAttrib(GL_ALL_ATTRIB_BITS);
-                if (debugBVHLeaf) {
+                if (debugBVHLeaf || debugSAHLevel) {
                     glEnable(GL_POLYGON_OFFSET_FILL);
                     // To ensure that debug draw is always visible, adjust the scale used to calculate the depth value.
                     glPolygonOffset(float(1.4), 1.0);
@@ -493,7 +493,11 @@ int main(int argc, char** argv)
                     if (debugBVHLeaf)
                         bvh.debugDrawLeaf(bvhDebugLeaf);
                     if (debugSAHLevel)
-                        showSAHNode(bvh, sahNodeIndex);
+                    {
+                        Sampler sampler = { debugRaySeed };
+                        test( sampler , bvh, sahNodeIndex);
+                    }
+                        
                     if (debugBVHIntersection && !debugRays.empty())
                         drawBVHIntersection(bvh, debugRays[0], bvhIntersectionIndex, showParent, showLeftChild, showRightChild);
                     enableDebugDraw = false;
