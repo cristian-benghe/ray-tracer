@@ -264,29 +264,33 @@ glm::vec3 sampleEnvironmentMap(RenderState& state, Ray ray)
         float y = ray.direction.y;
         float z = ray.direction.z;
 
+        // find the largest component of the ray direction vector
+        // based on this, we can determine which square of the cube map the ray will hit
         float longest = std::max(std::max(std::abs(x), std::abs(y)), std::abs(z));
 
-        // the ray hits the positive z square - front
+        // the ray hits the positive z square -> front
         if (std::abs(z) == longest && z >= 0)
+            // the formula for the conversion from 3D coordinates 
+            // to 2D texture coordinates is from https://en.wikipedia.org/wiki/Cube_mapping (the rest of the code is not)
             return sampleTextureNearest(state.scene.envtex[5], glm::vec2 { (-(x / z) + 1.0f) / 2.0f, ((y / z) + 1.0f) / 2.0f });
         
-        // the ray hits the negative z square - back
+        // the ray hits the negative z square -> back
         else if (std::abs(z) == longest && z < 0)
-            return sampleTextureNearest(state.scene.envtex[2], glm::vec2 { (-(x / z) + 1.0f) / 2.0f, (-(y/z) + 1.0f) / 2.0f });
+            return sampleTextureNearest(state.scene.envtex[2], glm::vec2 { (-(x / z) + 1.0f) / 2.0f, (-(y / z) + 1.0f) / 2.0f });
         
-        // the ray hits the positive x square - right
+        // the ray hits the positive x square -> right
         else if (std::abs(x) == longest && x >= 0)
             return sampleTextureNearest(state.scene.envtex[0], glm::vec2 { ((z / x) + 1.0f) / 2.0f, ((y / x) + 1.0f) / 2.0f });
         
-        // the ray hits the negative x square - left
+        // the ray hits the negative x square -> left
         else if (std::abs(x) == longest && x < 0)
             return sampleTextureNearest(state.scene.envtex[3], glm::vec2 { ((z / x) + 1.0f) / 2.0f, (-(y / x) + 1.0f) / 2.0f });
         
-        // the ray hits the positive y square - up
+        // the ray hits the positive y square -> up
         else if (std::abs(y) == longest && y >= 0)
             return sampleTextureNearest(state.scene.envtex[4], glm::vec2 { (-(x / y) + 1.0f) / 2.0f, (-(z / y) + 1.0f) / 2.0f });
         
-        // the ray hits the negative y square - down
+        // the ray hits the negative y square -> down
         else if (std::abs(y) == longest && y < 0)
             return sampleTextureNearest(state.scene.envtex[1], glm::vec2 { ((x / y) + 1.0f) / 2.0f, (-(z / y) + 1.0f) / 2.0f });
         
