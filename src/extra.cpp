@@ -4,6 +4,32 @@
 #include "recursive.h"
 #include "shading.h"
 #include <framework/trackball.h>
+
+
+std::vector<Ray> sampledRaysDebug(const Trackball& camera, const glm::vec3& targetDirection, int numRays, float apertureSize, float focusDistance)
+{
+    std::vector<Ray> rayList;
+
+    //Uniform distribution sampler
+    std::random_device randomDevice;
+    std::mt19937 randomGen(randomDevice());
+    std::uniform_real_distribution<float> randomDistr(-1.0f, 1.0f);
+
+    glm::vec3 cameraUp = camera.up();
+    glm::vec3 cameraLeft = camera.left();
+
+    for (int i = 0; i < numRays; ++i) {
+        float offset_x = 2.0f * randomDistr(randomGen) * apertureSize;
+        float offset_y = 2.0f * randomDistr(randomGen) * apertureSize;
+
+
+        glm::vec3 focalPoint = glm::normalize(targetDirection) * focusDistance + camera.position();
+        glm::vec3 rayOrigin = camera.position() + offset_x * cameraLeft + offset_y * cameraUp;
+        rayList.push_back(Ray { rayOrigin, glm::normalize(focalPoint - rayOrigin), std::numeric_limits<float>::max() });
+    }
+    return rayList;
+}
+
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance)
 {
     std::vector<Ray> rays;
@@ -227,6 +253,26 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
     }
     
     hitColor += computedGlossyColor / (float) numSamples * hitInfo.material.ks;
+}
+
+std::vector<glm::vec3> drawSampleCircleGlossyDebug(Ray r, glm::vec3 hitPosition) {
+    glm::vec3 circleNormal = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), r.direction));
+
+    std::vector<glm::vec3> vertices;
+
+    for (int i = 0; i < 100; ++i) {
+        float angle1 = static_cast<float>(i) / 100 * glm::two_pi<float>();
+        float angle2 = static_cast<float>(i + 1) / 100 * glm::two_pi<float>();
+
+        glm::vec3 vertex1 = hitPosition + 0.05f * (glm::normalize(glm::cross(circleNormal, r.direction)) * cos(angle1) + circleNormal * sin(angle1));
+        glm::vec3 vertex2 = hitPosition + 0.05f * (glm::normalize(glm::cross(circleNormal, r.direction)) * cos(angle2) + circleNormal * sin(angle2));
+        glm::vec3 vertex3 = hitPosition;
+
+        vertices.push_back(vertex1);
+        vertices.push_back(vertex2);
+        vertices.push_back(vertex3);
+    }
+    return vertices;
 }
 
 // TODO; Extra feature

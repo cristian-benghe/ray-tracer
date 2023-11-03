@@ -109,8 +109,6 @@ glm::vec3 visibilityOfLightSampleTransparency(RenderState& state, const glm::vec
     float d = glm::length(lightPosition - pointOfIntersection);
     do 
     {
-       
-        
         state.bvh.intersect(state, r, whereHit);
         if (r.t - 100 * FLT_EPSILON > d)
             return visibleLightColor;
