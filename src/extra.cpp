@@ -4,6 +4,7 @@
 #include "recursive.h"
 #include "shading.h"
 #include <framework/trackball.h>
+#include <texture.h>
 std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, float apertureSize, int numRays, const Trackball& camera, float focusDistance)
 {
     std::vector<Ray> rays;
@@ -107,6 +108,7 @@ Screen onlyBrightPixels(const Screen& image)
 
 int factorial(int n) 
 {
+    // simple recursive factorial implementation
     if (n == 1 || n == 0) return 1;
     else return n * factorial(n - 1);
 }
@@ -116,9 +118,10 @@ std::vector<float> calculateGaussianKernel(int size)
     std::vector<float> kernel;
     float coefficientSum = 0.0f;
     int nFactorial = factorial(size);
-
+ 
     for (int i = 0; i <= size; i++) {
         
+        // al the values above are from the binomial coefficient formula
         int nkFactorial = factorial(size - i);
         int kFactorial = factorial(i);
 
@@ -168,12 +171,9 @@ void applyGaussianFilter(Screen& image, std::vector<float> kernel, bool isHorizo
 }
 
 void applyBloom(Screen& normal, Screen& bright) {
-
     for (int i = 0; i < normal.resolution().x; i++) {
         for (int j = 0; j < normal.resolution().y; j++) {
-
-            int index = normal.indexAt(i, j);
-            normal.setPixel(i, j, normal.pixels()[index] + bright.pixels()[index]);
+            normal.setPixel(i, j, normal.pixels()[normal.indexAt(i, j)] + bright.pixels()[normal.indexAt(i, j)]);
         }
     }
 }
@@ -246,17 +246,52 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
 
 // TODO; Extra feature
 // Given a camera ray (or reflected camera ray) that does not intersect the scene, evaluates the contribution
-// along the ray, originating from an environment map. You will have to add support for environment textures
+// along the ray, originating from an environment map. 
+// 
+// You will have to add support for environment textures
 // to the Scene object, and provide a scene with the right data to supply this.
+// 
 // - state; the active scene, feature config, bvh, and sampler
 // - ray;   ray object
+// 
 // This method is not unit-tested, but we do expect to find it **exactly here**, and we'd rather
 // not go on a hunting expedition for your implementation, so please keep it here!
 glm::vec3 sampleEnvironmentMap(RenderState& state, Ray ray)
 {
     if (state.features.extra.enableEnvironmentMap) {
-        // Part of your implementation should go here
+
+        float x = ray.direction.x;
+        float y = ray.direction.y;
+        float z = ray.direction.z;
+
+        float longest = std::max(std::max(std::abs(x), std::abs(y)), std::abs(z));
+
+        // the ray hits the positive z square - front
+        if (std::abs(z) == longest && z >= 0)
+            return sampleTextureNearest(state.scene.envtex[5], glm::vec2 { (-(x / z) + 1.0f) / 2.0f, ((y / z) + 1.0f) / 2.0f });
+        
+        // the ray hits the negative z square - back
+        else if (std::abs(z) == longest && z < 0)
+            return sampleTextureNearest(state.scene.envtex[2], glm::vec2 { (-(x / z) + 1.0f) / 2.0f, (-(y/z) + 1.0f) / 2.0f });
+        
+        // the ray hits the positive x square - right
+        else if (std::abs(x) == longest && x >= 0)
+            return sampleTextureNearest(state.scene.envtex[0], glm::vec2 { ((z / x) + 1.0f) / 2.0f, ((y / x) + 1.0f) / 2.0f });
+        
+        // the ray hits the negative x square - left
+        else if (std::abs(x) == longest && x < 0)
+            return sampleTextureNearest(state.scene.envtex[3], glm::vec2 { ((z / x) + 1.0f) / 2.0f, (-(y / x) + 1.0f) / 2.0f });
+        
+        // the ray hits the positive y square - up
+        else if (std::abs(y) == longest && y >= 0)
+            return sampleTextureNearest(state.scene.envtex[4], glm::vec2 { (-(x / y) + 1.0f) / 2.0f, (-(z / y) + 1.0f) / 2.0f });
+        
+        // the ray hits the negative y square - down
+        else if (std::abs(y) == longest && y < 0)
+            return sampleTextureNearest(state.scene.envtex[1], glm::vec2 { ((x / y) + 1.0f) / 2.0f, (-(z / y) + 1.0f) / 2.0f });
+        
         return glm::vec3(0.f);
+
     } else {
         return glm::vec3(0.f);
     }

@@ -34,8 +34,8 @@ struct Scene {
     std::vector<Sphere> spheres;
     std::vector<SceneLight> lights;
 
-    // You can add your own objects (e.g. environment maps) here
-    // ...
+    // the added field for environment mapping
+    std::vector<Image> envtex;
 };
 
 // Load a prebuilt scene.

@@ -108,6 +108,15 @@ Scene loadScenePrebuilt(SceneType type, const std::filesystem::path& dataDir)
     } break;
     };
 
+    // these are the hard coded images for the environment map
+    // I got them from https://humus.name/
+    scene.envtex.push_back(Image(DATA_DIR "negx.jpg"));
+    scene.envtex.push_back(Image(DATA_DIR "negy.jpg"));
+    scene.envtex.push_back(Image(DATA_DIR "negz.jpg"));
+    scene.envtex.push_back(Image(DATA_DIR "posx.jpg"));
+    scene.envtex.push_back(Image(DATA_DIR "posy.jpg"));
+    scene.envtex.push_back(Image(DATA_DIR "posz.jpg"));
+
     return scene;
 }
 
