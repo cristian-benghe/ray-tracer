@@ -86,6 +86,7 @@ void renderImageWithMotionBlur(const Scene& scene, const BVHInterface& bvh, cons
 
 Screen onlyBrightPixels(const Screen& image) 
 {
+    // this method only selects pixels that are above a certain brightness threshold
     Screen onlyBright = image;
     
     int x = image.resolution().x;
@@ -97,6 +98,7 @@ Screen onlyBrightPixels(const Screen& image)
             glm::vec3 currentPixel = image.pixels()[image.indexAt(i, j)];
 
             // convert to grayscale and comapre with brightness threshold
+            // the coefficients I got from here https://samirkhanal35.medium.com/grayscale-conversion-56189cd0e9ca
             if (currentPixel.x * 0.299 + currentPixel.y * 0.587 + currentPixel.z * 0.114 <= 0.4) {
                 onlyBright.setPixel(i, j, glm::vec3(0.0f));
             }
@@ -121,7 +123,7 @@ std::vector<float> calculateGaussianKernel(int size)
  
     for (int i = 0; i <= size; i++) {
         
-        // al the values above are from the binomial coefficient formula
+        // all the values below are from the binomial coefficient formula
         int nkFactorial = factorial(size - i);
         int kFactorial = factorial(i);
 
@@ -150,16 +152,23 @@ void applyGaussianFilter(Screen& image, std::vector<float> kernel, bool isHorizo
 
             glm::vec3 newColor = glm::vec3(0);
 
+            // iterate over the coefficients in the kernel
             for (int k = 0; k < kernel.size(); k++) {
 
+                // the same method is used for both the horizontal and vertical
+                // filtering so we check for the isHorizontal variable
                 if (isHorizontal) {
+                    // caluclate the coordinate in the horizontal direction
                     int coordI = i - halfExtent + k;
 
+                    // make sure the coordinate is within image boundaries
                     if (coordI >= 0 && coordI < x)
                         newColor += image.pixels()[image.indexAt(coordI, j)] * kernel[k];
                 } else {
+                    // caluculate the coordinate in the vertical direction
                     int coordJ = j - halfExtent + k;
 
+                    // make sure the coordinate is within image boundaries
                     if (coordJ >= 0 && coordJ < y)
                         newColor += image.pixels()[image.indexAt(i, coordJ)] * kernel[k];
                 }
@@ -171,6 +180,7 @@ void applyGaussianFilter(Screen& image, std::vector<float> kernel, bool isHorizo
 }
 
 void applyBloom(Screen& normal, Screen& bright) {
+    // we iterate over all the pixels in the main image and apply the filter on them
     for (int i = 0; i < normal.resolution().x; i++) {
         for (int j = 0; j < normal.resolution().y; j++) {
             normal.setPixel(i, j, normal.pixels()[normal.indexAt(i, j)] + bright.pixels()[normal.indexAt(i, j)]);
@@ -187,10 +197,13 @@ void postprocessImageWithBloom(const Scene& scene, const Features& features, con
     if (!features.extra.enableBloomEffect) {
         return;
     }
+    // all the methods defined above are just called in the main method
+    // first we create a new Screen with the bright pixels and apply the filter on them
     Screen brightPixels = onlyBrightPixels(image);
     std::vector<float> kernel = calculateGaussianKernel(16);
     applyGaussianFilter(brightPixels, kernel, true);
     applyGaussianFilter(brightPixels, kernel, false);
+    // then we apply the full filter on the main Screen -> image
     applyBloom(image, brightPixels);
 }
 
