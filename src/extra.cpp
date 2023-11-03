@@ -16,18 +16,23 @@ std::vector<Ray> sampledRaysDebug(const Trackball& camera, const glm::vec3& targ
     std::mt19937 randomGen(randomDevice());
     std::uniform_real_distribution<float> randomDistr(-1.0f, 1.0f);
 
-    glm::vec3 cameraUp = camera.up();
+    //The following are the camera up and left vectors used to offset the origin
+    glm::vec3 cameraUp = camera.up(); 
     glm::vec3 cameraLeft = camera.left();
 
     for (int i = 0; i < numRays; ++i) {
+        // These ones will be used for the offset
         float offset_x = 2.0f * randomDistr(randomGen) * apertureSize;
         float offset_y = 2.0f * randomDistr(randomGen) * apertureSize;
 
 
+        //We compute the focal point
         glm::vec3 focalPoint = glm::normalize(targetDirection) * focusDistance + camera.position();
         glm::vec3 rayOrigin = camera.position() + offset_x * cameraLeft + offset_y * cameraUp;
+        // Construct a ray from the origin towards the focal point, normalizing the direction vector
         rayList.push_back(Ray { rayOrigin, glm::normalize(focalPoint - rayOrigin), std::numeric_limits<float>::max() });
     }
+    // Return the list of generated (perturbated) rays
     return rayList;
 }
 
@@ -39,14 +44,15 @@ std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, fl
     glm::vec3 cameraRight = -camera.left();
 
     for (int i = 0; i < numRays; ++i) {
+        // We generate random offsets within the square aperture
         float offset_x = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
         float offset_y = (2.0 * rand() / RAND_MAX - 1.0) * apertureSize;
-
+        
         glm::vec3 dirr = glm::normalize(pixelDirection);
-
+        //the focal point
         glm::vec3 pointt = dirr * focusDistance + pixelOrigin;
 
-        glm::vec3 origin = pixelOrigin + offset_x * cameraRight + offset_y * cameraUp;
+        glm::vec3 origin = pixelOrigin + offset_x * cameraRight + offset_y * cameraUp; //the origin including the offset
         rays.push_back(Ray { origin, glm::normalize(pointt - origin), std::numeric_limits<float>::max() });
     }
     return rays;
@@ -60,14 +66,16 @@ std::vector<Ray> sampledRays(glm::vec3 pixelOrigin, glm::vec3 pixelDirection, fl
 // not go on a hunting expedition for your implementation, so please keep it here!
 void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, const Features& features, const Trackball& camera, Screen& screen)
 {   
+    // Check if depth of field feature is enabled
     if (!features.extra.enableDepthOfField) {
         return;
     }
-    float depth = features.extra.depth; //focalDistance
+    float depth = features.extra.depth; //// Focal distance
     glm::vec2 position = (glm::vec2(0) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
     glm::vec3 dir = camera.generateRay(position).direction;
     glm::vec3 focalPoint = camera.position() + depth * dir; //point that is in focus
     //glm::vec3 directionToFocus = glm::normalize(focalPoint - camera.position());
+    //  Calculate focal distance (distance between camera and focal point)
     float focalDistance = glm::length(focalPoint - camera.position());
     //glm::vec3 lensPosition = camera.position() + focalDistance * directionToFocus;
 
@@ -86,10 +94,18 @@ void renderImageWithDepthOfField(const Scene& scene, const BVHInterface& bvh, co
             };
             glm::vec2 position = (glm::vec2(x,y) + 0.5f) / glm::vec2(screen.resolution()) * 2.f - 1.f;
              
-            auto rays = sampledRays(camera.generateRay(position).origin,
+            // Generate rays for depth of field by sampling multiple rays
+            auto rays = sampledRays(
+                camera.generateRay(position).origin,
                 camera.generateRay(position).direction,
-                0.10f, 8, camera, features.extra.depth);
-
+                features.extra.aperture, // Aperture size
+                features.extra.numRays, // Number of rays to sample
+                camera, // Camera settings
+                features.extra.depth // Depth of focus
+            );
+            
+            
+            // Render the rays and set the resulting color to the screen
             auto L = renderRays(state, rays);
             screen.setPixel(x, y, L);
         }
@@ -226,7 +242,7 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
 
     glm::vec3 u, v;
     glm::vec3 r = ray.direction;
-
+    // Calculate the vectors u and v they will span the circle
     u = glm::cross(glm::vec3(0, 1, 0), r);
     if (r == glm::vec3(0,1,0))
         u = glm::cross(glm::vec3(1, 0, 0), r);
@@ -239,9 +255,11 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
     glm::vec3 computedGlossyColor = glm::vec3(0);
 
     for (int i = 0; i < numSamples; ++i) {
+        // Generate random angles for r prime (the perturbated ray)
         float theta = (static_cast<float>(rand()) / RAND_MAX) * 2 * glm::pi<float>();
 
         float randomSmallerRadius = static_cast<double>(rand()) / RAND_MAX * radius;
+        // Calculate the direction of the perturbed ray
 
         glm::vec3 r_prime_direction = glm::normalize(reflectedRay.direction + hitInfo.material.shininess / 64.0f * 
             (u * (randomSmallerRadius * cos(theta)) + v * (randomSmallerRadius * sin(theta))));
@@ -250,21 +268,24 @@ void renderRayGlossyComponent(RenderState& state, Ray ray, const HitInfo& hitInf
         perturbedRay.origin = reflectedRay.origin;
         perturbedRay.direction = r_prime_direction;
         perturbedRay.t = std::numeric_limits<float>::max();
+        // Recursively render the perturbed ray
         computedGlossyColor += renderRay(state, perturbedRay, rayDepth + 1);
     }
     
-    hitColor += computedGlossyColor / (float) numSamples * hitInfo.material.ks;
+    hitColor += computedGlossyColor / (float) numSamples * hitInfo.material.ks; // We update the hit color based on the computed glossy color
+
 }
 
 std::vector<glm::vec3> drawSampleCircleGlossyDebug(Ray r, glm::vec3 hitPosition) {
+    // Calculate the normal of the circle
     glm::vec3 circleNormal = glm::normalize(glm::cross(glm::vec3(0.0f, 1.0f, 0.0f), r.direction));
 
     std::vector<glm::vec3> vertices;
-
+    // Loop to generate vertices for the circle (they will be used in GL_TRIANGLES_STRIP)
     for (int i = 0; i < 100; ++i) {
         float angle1 = static_cast<float>(i) / 100 * glm::two_pi<float>();
         float angle2 = static_cast<float>(i + 1) / 100 * glm::two_pi<float>();
-
+        // Calculate vertex positions on the circle
         glm::vec3 vertex1 = hitPosition + 0.05f * (glm::normalize(glm::cross(circleNormal, r.direction)) * cos(angle1) + circleNormal * sin(angle1));
         glm::vec3 vertex2 = hitPosition + 0.05f * (glm::normalize(glm::cross(circleNormal, r.direction)) * cos(angle2) + circleNormal * sin(angle2));
         glm::vec3 vertex3 = hitPosition;
@@ -273,7 +294,7 @@ std::vector<glm::vec3> drawSampleCircleGlossyDebug(Ray r, glm::vec3 hitPosition)
         vertices.push_back(vertex2);
         vertices.push_back(vertex3);
     }
-    return vertices;
+    return vertices; //the vertices to compute the circle
 }
 
 // TODO; Extra feature

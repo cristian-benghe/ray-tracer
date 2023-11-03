@@ -70,7 +70,9 @@ struct ExtraFeatures {
 
     // Parameters for glossy reflection
     uint32_t numGlossySamples = 1;
-    float depth=2.5f;
+    float depth = 2.5f;
+    float aperture = 0.04f;
+    int numRays = 8;
 };
 
 struct Features {
